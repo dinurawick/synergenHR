@@ -1,0 +1,62 @@
+================================================================================
+  SYNERGENHR DEPLOYMENT - FILES TO COPY
+================================================================================
+
+Copy these files to the other laptop's Horilla folder:
+
+📋 DEPLOYMENT SCRIPTS:
+✅ deploy_synergenhr.bat
+✅ update_company_name.py  
+✅ fix_company_dots.py
+✅ INSTALL_SYNERGENHR.txt
+✅ DEPLOYMENT_PACKAGE.md
+
+📋 LOGO FILES:
+✅ synergen/SYN_LOGO.png
+
+📋 UPDATED SYSTEM FILES:
+✅ base/context_processors.py
+✅ static/src/scss/abstracts/_variables.scss
+✅ static/build/css/style.min.css
+✅ static/images/ui/auth-logo.png
+✅ static/images/ui/horilla-logo.png
+✅ templates/login.html
+
+📋 TEMPLATE FILES (with SynergenHR branding):
+✅ templates/404.html
+✅ templates/403.html  
+✅ templates/405.html
+✅ templates/went_wrong.html
+✅ static/auth/login.html
+✅ static/auth/forgot-password.html
+✅ static/auth/reset.html
+✅ templates/initialize_database/horilla_company.html
+✅ templates/initialize_database/horilla_department.html
+✅ templates/initialize_database/horilla_job_position.html
+✅ templates/initialize_database/horilla_user.html
+✅ templates/initialize_database/horilla_user_signup.html
+
+📋 CONFIGURATION FILES:
+✅ package.json
+✅ README.md
+
+================================================================================
+  QUICK COPY COMMAND (if using same network):
+================================================================================
+
+If both laptops are on same network, you can copy the entire folder:
+1. Share the Horilla folder
+2. Copy all files to the target laptop
+3. Run deploy_synergenhr.bat on target laptop
+
+================================================================================
+  VERIFICATION:
+================================================================================
+
+Before running deployment, verify these files exist on target laptop:
+- horillavenv/ folder (virtual environment)
+- manage.py (Django management script)
+- .env file (database configuration)
+- synergen/SYN_LOGO.png (the logo file)
+
+================================================================================

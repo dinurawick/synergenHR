@@ -1,0 +1,31 @@
+================================================================================
+  SYNERGENHR - SIDEBAR FIX INSTRUCTIONS
+================================================================================
+
+I found the issue! The sidebar shows "Horilla" because it's reading from 
+the DATABASE, not just the template files.
+
+SOLUTION: I've created a script that will:
+✅ Update all company names in the database from "Horilla" to "SynergenHR"
+✅ Copy your logo to the company icon locations
+✅ Fix the sidebar branding
+
+TO FIX THE SIDEBAR:
+
+1. Stop your Django server (Ctrl+C)
+
+2. Run: restart_server.bat
+   (This will automatically update the database AND start the server)
+
+3. Clear browser cache (Ctrl+Shift+Delete)
+
+4. Reload the page
+
+YOU WILL NOW SEE:
+- Sidebar: "SynergenHR" instead of "Horilla"
+- Logo: Your synergen_logo.jpg in the sidebar
+- Colors: Blue and yellow throughout
+
+The script updates the actual Company records in your database!
+
+================================================================================

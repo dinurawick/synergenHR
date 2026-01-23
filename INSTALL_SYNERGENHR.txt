@@ -1,0 +1,81 @@
+================================================================================
+  SYNERGENHR INSTALLATION GUIDE
+================================================================================
+
+🚀 QUICK SETUP (3 STEPS):
+
+1. COPY FILES
+   - Copy all these files to the other laptop's Horilla folder
+   - Make sure synergen/SYN_LOGO.png is included
+
+2. RUN DEPLOYMENT
+   - Open PowerShell in the Horilla folder
+   - Type: .\deploy_synergenhr.bat
+   - Press Enter and follow the prompts
+
+3. CLEAR BROWSER CACHE
+   - Press Ctrl+Shift+Delete
+   - Clear "Cached images and files"
+   - Reload the page
+
+================================================================================
+  WHAT GETS CHANGED:
+================================================================================
+
+✅ LOGO: SynergenHR logo in sidebar and login page
+✅ COLORS: Blue (#0a0a5a) and Yellow (#dbf30d) throughout
+✅ TEXT: All "Horilla" changed to "SynergenHR"
+✅ DATABASE: Company names updated in existing database
+✅ SIDEBAR: Shows "SynergenHR" (clean, no dots)
+
+================================================================================
+  FILES TO COPY TO OTHER LAPTOP:
+================================================================================
+
+📁 REQUIRED FILES:
+- deploy_synergenhr.bat (main script)
+- update_company_name.py (database updater)
+- fix_company_dots.py (name cleaner)
+- synergen/SYN_LOGO.png (the logo)
+
+📁 UPDATED SYSTEM FILES:
+- base/context_processors.py
+- static/src/scss/abstracts/_variables.scss
+- static/build/css/style.min.css
+- static/images/ui/auth-logo.png
+- static/images/ui/horilla-logo.png
+- templates/login.html
+- All template files with SynergenHR branding
+
+================================================================================
+  TROUBLESHOOTING:
+================================================================================
+
+❌ "Virtual environment not found"
+   → Make sure horillavenv folder exists in Horilla directory
+
+❌ "Logo not found"
+   → Ensure synergen/SYN_LOGO.png file was copied
+
+❌ Still shows "Horilla"
+   → Clear browser cache completely (Ctrl+Shift+Delete)
+   → Try incognito/private browsing mode
+
+❌ Database errors
+   → Make sure PostgreSQL is running
+   → Check database credentials in .env file
+
+================================================================================
+  AFTER INSTALLATION:
+================================================================================
+
+✅ You should see:
+- "SynergenHR" in the sidebar (top left)
+- SynergenHR logo in sidebar
+- Blue and yellow color scheme
+- New login page design
+- All branding changed throughout the system
+
+🔄 Remember to clear browser cache on first visit!
+
+================================================================================
