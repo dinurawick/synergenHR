@@ -36,7 +36,30 @@ sleep 30
 if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
     echo "✅ Services are running successfully!"
     echo ""
-    echo "🎉 SynergenHR has been deployed!"
+    
+    # Ask about demo data
+    echo "🎭 Demo Data Options:"
+    echo "   SynergenHR includes comprehensive demo data with:"
+    echo "   • Sample employees and departments"
+    echo "   • Demo attendance and leave records"
+    echo "   • Example payroll and recruitment data"
+    echo "   • Asset management samples"
+    echo "   • Performance management examples"
+    echo ""
+    read -p "Would you like to load demo data? (y/N): " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "📊 Loading demo data..."
+        chmod +x deployment/load_demo_data.sh
+        ./deployment/load_demo_data.sh
+    else
+        echo "⏭️ Skipping demo data loading."
+        echo "   You can load it later by running: ./deployment/load_demo_data.sh"
+    fi
+    
+    echo ""
+    echo "🎉 SynergenHR has been deployed successfully!"
     echo ""
     echo "📋 Next steps:"
     echo "1. Update your domain DNS to point to this server"
@@ -48,6 +71,12 @@ if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
     echo "   Username: admin"
     echo "   Password: admin"
     echo "   ⚠️  CHANGE THESE IMMEDIATELY AFTER FIRST LOGIN!"
+    echo ""
+    echo "📚 Additional commands:"
+    echo "   Load demo data: ./deployment/load_demo_data.sh"
+    echo "   Create backup: ./deployment/db_backup.sh"
+    echo "   View logs: docker-compose -f docker-compose.prod.yml logs"
+    echo "   Restart: docker-compose -f docker-compose.prod.yml restart"
 else
     echo "❌ Deployment failed. Check logs with: docker-compose -f docker-compose.prod.yml logs"
     exit 1
