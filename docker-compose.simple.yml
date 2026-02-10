@@ -1,0 +1,41 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://postgres:${DB_PASSWORD}@db:5432/synergenhr"
+    command: sh ./entrypoint.sh
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.production
+
+  db:
+    image: postgres:16-bullseye
+    environment:
+      POSTGRES_DB: synergenhr
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    volumes:
+      - synergenhr-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  synergenhr-data:
