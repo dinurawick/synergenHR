@@ -61,6 +61,25 @@ class ContractForm(ModelForm):
                     "hx-swap": "beforebegin",
                 }
             )
+            # Pre-populate fields from employee work information when editing
+            if self.instance.employee_id:
+                from employee.models import EmployeeWorkInformation
+                work_info = EmployeeWorkInformation.objects.filter(
+                    employee_id=self.instance.employee_id
+                ).first()
+                if work_info:
+                    if not self.instance.department and work_info.department_id:
+                        self.initial["department"] = work_info.department_id
+                    if not self.instance.job_position and work_info.job_position_id:
+                        self.initial["job_position"] = work_info.job_position_id
+                    if not self.instance.job_role and work_info.job_role_id:
+                        self.initial["job_role"] = work_info.job_role_id
+                    if not self.instance.shift and work_info.shift_id:
+                        self.initial["shift"] = work_info.shift_id
+                    if not self.instance.work_type and work_info.work_type_id:
+                        self.initial["work_type"] = work_info.work_type_id
+                    if not self.instance.wage and work_info.basic_salary:
+                        self.initial["wage"] = work_info.basic_salary
         first = PayrollGeneralSetting.objects.first()
         if first and self.instance.pk is None:
             self.initial["notice_period_in_days"] = first.notice_period

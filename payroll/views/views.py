@@ -676,28 +676,42 @@ def contract_info_initial(request):
     """
     employee_id = request.GET["employee_id"]
     work_info = EmployeeWorkInformation.objects.filter(employee_id=employee_id).first()
-    response_data = {
-        "department": (
-            work_info.department_id.id if work_info.department_id is not None else ""
-        ),
-        "job_position": (
-            work_info.job_position_id.id
-            if work_info.job_position_id is not None
-            else ""
-        ),
-        "job_role": (
-            work_info.job_role_id.id if work_info.job_role_id is not None else ""
-        ),
-        "shift": work_info.shift_id.id if work_info.shift_id is not None else "",
-        "work_type": (
-            work_info.work_type_id.id if work_info.work_type_id is not None else ""
-        ),
-        "wage": work_info.basic_salary,
-        "contract_start_date": work_info.date_joining if work_info.date_joining else "",
-        "contract_end_date": (
-            work_info.contract_end_date if work_info.contract_end_date else ""
-        ),
-    }
+    
+    # Handle case where employee has no work information
+    if work_info is None:
+        response_data = {
+            "department": "",
+            "job_position": "",
+            "job_role": "",
+            "shift": "",
+            "work_type": "",
+            "wage": "",
+            "contract_start_date": "",
+            "contract_end_date": "",
+        }
+    else:
+        response_data = {
+            "department": (
+                work_info.department_id.id if work_info.department_id is not None else ""
+            ),
+            "job_position": (
+                work_info.job_position_id.id
+                if work_info.job_position_id is not None
+                else ""
+            ),
+            "job_role": (
+                work_info.job_role_id.id if work_info.job_role_id is not None else ""
+            ),
+            "shift": work_info.shift_id.id if work_info.shift_id is not None else "",
+            "work_type": (
+                work_info.work_type_id.id if work_info.work_type_id is not None else ""
+            ),
+            "wage": work_info.basic_salary if work_info.basic_salary else "",
+            "contract_start_date": work_info.date_joining if work_info.date_joining else "",
+            "contract_end_date": (
+                work_info.contract_end_date if work_info.contract_end_date else ""
+            ),
+        }
     return JsonResponse(response_data)
 
 
@@ -924,25 +938,44 @@ def employees_joined(request):
     """
     payroll dashboard employees joined this month data
     """
-    from employee.models import Employee
+    from employee.models import Employee, EmployeeWorkInformation
+    from payroll.models.models import Contract
 
     date = request.GET.get("period")
     month = date.split("-")[1]
     year = date.split("-")[0]
 
-    # Get employees who joined in the selected month/year
-    joined_employees = Employee.objects.filter(
-        employee_work_info__date_joining__month=int(month),
-        employee_work_info__date_joining__year=int(year)
-    )
+    # Get work info records for employees who joined in the selected month/year
+    work_info_records = EmployeeWorkInformation.objects.filter(
+        date_joining__month=int(month),
+        date_joining__year=int(year),
+        date_joining__isnull=False
+    ).select_related('employee_id')
 
     employees_list = []
-    for employee in joined_employees:
-        employees_list.append({
-            "employee_name": str(employee),
-            "employee_id": employee.id,
-            "date_joining": employee.employee_work_info.date_joining.strftime("%Y-%m-%d") if employee.employee_work_info.date_joining else None
-        })
+    for work_info in work_info_records:
+        if work_info.employee_id:
+            # Get the employee's current active contract or most recent contract
+            current_contract = Contract.objects.filter(
+                employee_id=work_info.employee_id,
+                contract_status='active'
+            ).order_by('-contract_start_date').first()
+            
+            # If no active contract, get the most recent contract
+            if not current_contract:
+                current_contract = Contract.objects.filter(
+                    employee_id=work_info.employee_id
+                ).order_by('-contract_start_date').first()
+            
+            contract_status = current_contract.contract_status if current_contract else 'draft'
+            
+            employees_list.append({
+                "employee_name": str(work_info.employee_id),
+                "employee_id": work_info.employee_id.id,
+                "date_joining": work_info.date_joining.strftime("%Y-%m-%d"),
+                "is_active": work_info.employee_id.is_active,
+                "contract_status": contract_status
+            })
 
     response = {
         "joined_employees": employees_list,

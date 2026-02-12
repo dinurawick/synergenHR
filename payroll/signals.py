@@ -112,3 +112,39 @@ def create_installments(sender, instance, created, **kwargs):
                         installments.append(installment)
 
                 instance.deduction_ids.add(*installments)
+
+
+@receiver(post_save, sender=Contract)
+def sync_contract_to_employee_work_info(sender, instance, created, **kwargs):
+    """
+    Sync contract changes back to EmployeeWorkInformation
+    This ensures employee profile shows current contract data
+    """
+    if instance.employee_id and hasattr(instance.employee_id, 'employee_work_info'):
+        work_info = instance.employee_id.employee_work_info
+        
+        # Only sync if this is the active contract for the employee
+        # Get the most recent active contract for this employee
+        latest_active_contract = Contract.objects.filter(
+            employee_id=instance.employee_id,
+            contract_status='active'
+        ).order_by('-contract_start_date').first()
+        
+        # If this is the latest active contract, sync the data
+        if latest_active_contract and latest_active_contract.id == instance.id:
+            # Sync contract end date
+            if work_info.contract_end_date != instance.contract_end_date:
+                work_info.contract_end_date = instance.contract_end_date
+                work_info.save()
+        
+        # If no active contract exists, check if this is the most recent contract
+        elif not latest_active_contract:
+            most_recent_contract = Contract.objects.filter(
+                employee_id=instance.employee_id
+            ).order_by('-contract_start_date').first()
+            
+            if most_recent_contract and most_recent_contract.id == instance.id:
+                # Sync contract end date from most recent contract
+                if work_info.contract_end_date != instance.contract_end_date:
+                    work_info.contract_end_date = instance.contract_end_date
+                    work_info.save()
