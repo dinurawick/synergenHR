@@ -84,7 +84,7 @@ class AllowanceForm(ModelForm):
                 filter_template_path="employee_filters.html",
                 instance=self.instance,
             ),
-            label="Specific Employees",
+            label="Select specific employees to exclude",
         )
         self.fields["if_condition"].widget.attrs.update(
             {
@@ -224,7 +224,7 @@ class DeductionForm(ModelForm):
                 filter_template_path="employee_filters.html",
                 instance=self.instance,
             ),
-            label="Specific Employees",
+            label="Select specific employees to exclude",
         )
         self.fields["if_condition"].widget.attrs.update(
             {

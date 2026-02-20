@@ -158,14 +158,43 @@ function initializeSummernote(candId,searchWords,) {
         >
           <ul class="oh-sidebar__submenu-items">
               {% for submenu in menues.submenu %}
-              <li class="oh-sidebar__submenu-item">
-              <a
-                  href="{{submenu.redirect}}"
-                  class="oh-sidebar__submenu-link"
-              >
-                  {{submenu.menu}}
-              </a>
-              </li>
+              {% if submenu.submenus %}
+                {# Nested submenu with children #}
+                <li class="oh-sidebar__submenu-item" style="padding-left: 0 !important; margin: 0;" x-data="{ isNestedOpen: getOpenState('{{menues.app}}_{{forloop.counter}}') }">
+                  <a
+                      href="javascript:void(0)"
+                      class="oh-sidebar__submenu-link"
+                      @click="isNestedOpen = !isNestedOpen; saveOpenState('{{menues.app}}_{{forloop.counter}}', isNestedOpen)"
+                      style="display: flex; justify-content: space-between; align-items: center; padding-left: 15px;"
+                  >
+                      <span>{{submenu.menu}}</span>
+                      <ion-icon :name="isNestedOpen ? 'chevron-down-outline' : 'chevron-forward-outline'" style="font-size: 16px;"></ion-icon>
+                  </a>
+                  <ul class="oh-sidebar__submenu-items" x-show="isNestedOpen" x-transition style="display: none; margin: 0; padding: 0; margin-top: 7px;">
+                    {% for nested_submenu in submenu.submenus %}
+                    <li class="oh-sidebar__submenu-item" style="padding-left: 0 !important; margin-bottom: 0;">
+                      <a
+                          href="{{nested_submenu.redirect}}"
+                          class="oh-sidebar__submenu-link"
+                          style="padding: 3px 15px 3px 30px; display: block;"
+                      >
+                          {{nested_submenu.menu}}
+                      </a>
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </li>
+              {% else %}
+                {# Regular submenu without children #}
+                <li class="oh-sidebar__submenu-item">
+                  <a
+                      href="{{submenu.redirect}}"
+                      class="oh-sidebar__submenu-link"
+                  >
+                      {{submenu.menu}}
+                  </a>
+                </li>
+              {% endif %}
               {% endfor %}
           </ul>
         </div>

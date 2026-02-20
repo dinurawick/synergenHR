@@ -16,6 +16,7 @@ urlpatterns = [
         name="allowances-deductions-tab",
     ),
     path("create-allowance", component_views.create_allowance, name="create-allowance"),
+    path("get-active-employees", component_views.get_active_employees, name="get-active-employees"),
     path("view-allowance/", component_views.view_allowance, name="view-allowance"),
     path(
         "single-allowance-view/<int:allowance_id>",

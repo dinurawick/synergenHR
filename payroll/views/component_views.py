@@ -405,6 +405,22 @@ def create_allowance(request):
 
 
 @login_required
+def get_active_employees(request):
+    """
+    API endpoint to get all active employees
+    """
+    employees = Employee.objects.filter(is_active=True).values('id', 'employee_first_name', 'employee_last_name', 'badge_id')
+    employee_list = [
+        {
+            'id': emp['id'],
+            'text': f"{emp['employee_first_name']} {emp['employee_last_name']} ({emp['badge_id']})"
+        }
+        for emp in employees
+    ]
+    return JsonResponse({'employees': employee_list})
+
+
+@login_required
 @permission_required("payroll.view_allowance")
 def view_allowance(request):
     """

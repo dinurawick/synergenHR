@@ -1,6 +1,21 @@
 {% load widget_tweaks %}
 {% load i18n %}
 
+<style>
+  /* Hide specific contract fields */
+  .hide-field-wage_type,
+  .hide-field-pay_frequency,
+  .hide-field-job_role,
+  .hide-field-shift,
+  .hide-field-notice_period_in_days,
+  .hide-field-work_type,
+  .hide-field-contract_document,
+  .hide-field-deduct_leave_from_basic_pay,
+  .hide-field-calculate_daily_leave_amount {
+    display: none !important;
+  }
+</style>
+
 <div class="oh-general__tab-target oh-profile-section" id="personal">
   <div class="oh-payslip__header">
     <div class="oh-payslip__header-left">
@@ -23,7 +38,7 @@
         {% if field.name != 'contract_status' %}
 
           {% if field.name == 'note' %}
-            <div class="col-12 col-md-12">
+            <div class="col-12 col-md-12 hide-field-{{ field.name }}">
               <div class="oh-label__info" for="id_{{ field.name }}">
                 <label class="oh-label {% if field.field.required %} required-star{% endif %}" for="id_{{ field.name }}">{% trans field.label %}</label>
                 {% if field.help_text != "" %}
@@ -39,7 +54,7 @@
               {{field.errors}}
             </div>
           {% else %}
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-6 hide-field-{{ field.name }}">
               <div class="oh-label__info" for="id_{{ field.name }}">
                 <label class="oh-label {% if field.field.required %} required-star{% endif %}" for="id_{{ field.name }}">{% trans field.label %}</label>
                 {% if field.help_text != "" %}

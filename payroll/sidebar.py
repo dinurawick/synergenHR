@@ -21,14 +21,21 @@ SUBMENUS = [
         "accessibility": "payroll.sidebar.dasbhoard_accessibility",
     },
     {
-        "menu": trans("Earnings"),
-        "redirect": reverse("view-allowance"),
-        "accessibility": "payroll.sidebar.allowance_accessibility",
-    },
-    {
-        "menu": trans("Deductions"),
-        "redirect": reverse("view-deduction"),
-        "accessibility": "payroll.sidebar.deduction_accessibility",
+        "menu": trans("Pay Items"),
+        "redirect": "#",
+        "accessibility": "payroll.sidebar.pay_items_accessibility",
+        "submenus": [
+            {
+                "menu": trans("Earnings"),
+                "redirect": reverse("view-allowance"),
+                "accessibility": "payroll.sidebar.allowance_accessibility",
+            },
+            {
+                "menu": trans("Deductions"),
+                "redirect": reverse("view-deduction"),
+                "accessibility": "payroll.sidebar.deduction_accessibility",
+            },
+        ],
     },
     {
         "menu": trans("Payslips"),
@@ -53,6 +60,10 @@ SUBMENUS = [
 
 def dasbhoard_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("payroll.view_contract")
+
+
+def pay_items_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("payroll.view_allowance") or request.user.has_perm("payroll.view_deduction")
 
 
 def allowance_accessibility(request, submenu, user_perms, *args, **kwargs):

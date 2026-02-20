@@ -968,10 +968,12 @@ def employees_joined(request):
                 ).order_by('-contract_start_date').first()
             
             contract_status = current_contract.contract_status if current_contract else 'draft'
+            contract_id = current_contract.id if current_contract else None
             
             employees_list.append({
                 "employee_name": str(work_info.employee_id),
                 "employee_id": work_info.employee_id.id,
+                "contract_id": contract_id,
                 "date_joining": work_info.date_joining.strftime("%Y-%m-%d"),
                 "is_active": work_info.employee_id.is_active,
                 "contract_status": contract_status

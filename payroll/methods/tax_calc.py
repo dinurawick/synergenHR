@@ -64,13 +64,13 @@ def calculate_taxable_amount(**kwargs):
     else:
         income = float(basic_pay)
 
-    year = end_date.year
-    check_start_date = datetime.date(year, 1, 1)
-    check_end_date = datetime.date(year, 12, 31)
-    total_days = (check_end_date - check_start_date).days + 1
-    yearly_income = income / num_days * total_days
+    # Use income directly as monthly income without annualization
+    # This treats the period income as the monthly income for tax calculation
+    monthly_income = income
+    yearly_income = monthly_income * 12
     yearly_income = compute_yearly_taxable_amount(income, yearly_income)
     yearly_income = round(yearly_income, 2)
+    
     federal_tax = 0
     if filing is not None and not filing.use_py:
         brackets = [
@@ -107,16 +107,7 @@ def pass_print(*args, **kwargs):
         except Exception as e:
             logger.error(e)
 
-    federal_tax_for_period = 0
-    if federal_tax and (tax_brackets.exists() or filing.use_py):
-        daily_federal_tax = federal_tax / total_days
-        federal_tax_for_period = daily_federal_tax * num_days
-
-    federal_tax_for_period = convert_year_tax_to_period(
-        federal_tax_for_period=federal_tax_for_period,
-        yearly_tax=federal_tax,
-        total_days=total_days,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    # Return the monthly tax directly without daily proration
+    federal_tax_for_period = federal_tax / 12
+    
     return federal_tax_for_period
