@@ -589,7 +589,7 @@ class Candidate(HorillaModel):
             return ""
 
     def save(self, *args, **kwargs):
-        if self.stage_id is not None:
+        if not self.converted and self.stage_id is not None:
             self.hired = self.stage_id.stage_type == "hired"
 
         if not self.recruitment_id.is_event_based and self.job_position_id is None:
@@ -623,7 +623,6 @@ class Candidate(HorillaModel):
             raise ValidationError(_("Employee is uniques for candidate"))
 
         if self.converted:
-            self.hired = False
             self.canceled = False
 
         super().save(*args, **kwargs)

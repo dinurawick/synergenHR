@@ -120,6 +120,65 @@ class FilingStatus(HorillaModel):
         verbose_name_plural = _("Filing Statuses")
 
 
+class ConditionalFormatting(HorillaModel):
+    """
+    ConditionalFormatting model for custom Python code conditions
+    """
+
+    MODULE_TYPE_CHOICES = [
+        ("payroll_earnings", _("Payroll (Earnings)")),
+        ("payroll_deductions", _("Payroll (Deductions)")),
+        ("leave", _("Leave")),
+    ]
+
+    name = models.CharField(
+        max_length=100,
+        blank=False,
+        verbose_name=_("Name"),
+        help_text=_("Name for this conditional formatting rule"),
+    )
+    module_type = models.CharField(
+        max_length=50,
+        choices=MODULE_TYPE_CHOICES,
+        verbose_name=_("Module Type"),
+        help_text=_("Which module this formatting applies to"),
+    )
+    use_python_code = models.BooleanField(
+        verbose_name=_("Use Python Code"), 
+        default=False
+    )
+    python_code = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name=_("Python Code"),
+        help_text=_("Custom Python code for conditions and calculations"),
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name=_("Description"),
+        max_length=500,
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Active"),
+    )
+    company_id = models.ForeignKey(
+        Company, null=True, editable=False, on_delete=models.PROTECT
+    )
+    objects = HorillaCompanyManager()
+
+    # Exempt python_code field from XSS validation
+    xss_exempt_fields = ["python_code"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_module_type_display()})"
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = _("Conditional Formatting")
+        verbose_name_plural = _("Conditional Formatting Rules")
+
+
 class Contract(HorillaModel):
     """
     Contract Model
@@ -780,6 +839,21 @@ class Allowance(HorillaModel):
         to the specific employees when the condition satisfies with the employee's information"
         ),
     )
+    # NEW: Link to conditional formatting rule
+    use_conditional_formatting = models.BooleanField(
+        default=False,
+        verbose_name=_("Use Conditional Formatting"),
+        help_text=_("Apply a pre-defined conditional formatting rule to this allowance"),
+    )
+    conditional_formatting_rule = models.ForeignKey(
+        'ConditionalFormatting',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='allowances',
+        verbose_name=_("Conditional Formatting Rule"),
+        help_text=_("Select a conditional formatting rule to apply"),
+    )
     # If condition based
     field = models.CharField(
         max_length=255,
@@ -1126,6 +1200,21 @@ class Deduction(HorillaModel):
             "This field is used to target deduction \
         to the specific employees when the condition satisfies with the employee's information"
         ),
+    )
+    # NEW: Link to conditional formatting rule
+    use_conditional_formatting = models.BooleanField(
+        default=False,
+        verbose_name=_("Use Conditional Formatting"),
+        help_text=_("Apply a pre-defined conditional formatting rule to this deduction"),
+    )
+    conditional_formatting_rule = models.ForeignKey(
+        'ConditionalFormatting',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='deductions',
+        verbose_name=_("Conditional Formatting Rule"),
+        help_text=_("Select a conditional formatting rule to apply"),
     )
     # If condition based then must fill field, value, and condition,
     field = models.CharField(

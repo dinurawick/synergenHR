@@ -315,10 +315,20 @@ function initializeSummernote(candId,searchWords,) {
               >
             </li>
             {% endif %}
+            {% if perms.payroll.view_conditionalformatting %}
+            <li class="oh-sidebar__submenu-item">
+              <a
+                href="{% url 'conditional-formatting-view' %}"
+                class="oh-sidebar__submenu-link"
+                >{% trans "Conditional Formatting" %}</a
+              >
+            </li>
+            {% endif %}
           </ul>
         </div>
       </li>
       {% endif %}
+
     </ul>
   </div>
 </div>

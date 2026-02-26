@@ -91,6 +91,31 @@ class AllowanceForm(ModelForm):
                 "onchange": "rangeToggle($(this))",
             }
         )
+        
+        # Add conditional formatting dropdown
+        from payroll.models.models import ConditionalFormatting
+        self.fields["conditional_formatting_rule"].queryset = ConditionalFormatting.objects.filter(
+            module_type="payroll_earnings",
+            is_active=True,
+            use_python_code=True
+        )
+        self.fields["conditional_formatting_rule"].required = False
+        self.fields["conditional_formatting_rule"].empty_label = "Select a rule..."
+        self.fields["conditional_formatting_rule"].widget.attrs.update({
+            "id": "id_conditional_formatting_rule"
+        })
+        
+        # Add toggle behavior for conditional formatting
+        self.fields["use_conditional_formatting"].widget.attrs.update({
+            "id": "id_use_conditional_formatting",
+            "onchange": "toggleConditionalFormattingDropdown($(this))",
+            "class": "oh-switch__checkbox"
+        })
+        
+        # Make amount not required when using conditional formatting
+        # The JavaScript will handle showing/hiding the amount field
+        self.fields["amount"].help_text = "Leave empty when using conditional formatting (the rule will calculate the amount)"
+        
         reload_queryset(self.fields)
         self.fields["style"].widget = widget.StyleWidget(form=self)
 
@@ -108,10 +133,27 @@ class AllowanceForm(ModelForm):
         specific_employees = self.data.getlist("specific_employees")
         include_all = self.data.get("include_active_employees")
         condition_based = self.data.get("is_condition_based")
+        use_conditional = self.data.get("use_conditional_formatting")
+
+        # If using conditional formatting, amount is not required
+        if use_conditional:
+            if 'amount' in self.errors:
+                del self.errors['amount']
+            if not cleaned_data.get('amount'):
+                cleaned_data['amount'] = 0  # Set to 0, will be calculated by rule
 
         for field_name, field_instance in self.fields.items():
             if isinstance(field_instance, HorillaMultiSelectField):
                 self.errors.pop(field_name, None)
+                # Skip validation if using conditional formatting
+                if use_conditional:
+                    cleaned_data = super().clean()
+                    data = self.fields[field_name].queryset.filter(
+                        id__in=self.data.getlist(field_name)
+                    )
+                    cleaned_data[field_name] = data
+                    continue
+                    
                 if (
                     not specific_employees
                     and include_all is None
@@ -156,8 +198,15 @@ class AllowanceForm(ModelForm):
         specific_employees = self.data.getlist("specific_employees")
         include_all = self.data.get("include_active_employees")
         condition_based = self.data.get("is_condition_based")
-        if not specific_employees and not include_all and not condition_based:
+        use_conditional = self.data.get("use_conditional_formatting")
+        
+        # If using conditional formatting, set include_active_employees to True
+        # The conditional rule will filter who actually gets it
+        if not specific_employees and not include_all and not condition_based and not use_conditional:
             self.instance.include_active_employees = True
+        elif use_conditional and not specific_employees and not include_all:
+            self.instance.include_active_employees = True
+            
         super().save(commit)
         other_conditions = self.data.getlist("other_conditions")
         other_fields = self.data.getlist("other_fields")
@@ -231,6 +280,30 @@ class DeductionForm(ModelForm):
                 "onchange": "rangeToggle($(this))",
             }
         )
+        
+        # Add conditional formatting dropdown
+        from payroll.models.models import ConditionalFormatting
+        self.fields["conditional_formatting_rule"].queryset = ConditionalFormatting.objects.filter(
+            module_type="payroll_deductions",
+            is_active=True,
+            use_python_code=True
+        )
+        self.fields["conditional_formatting_rule"].required = False
+        self.fields["conditional_formatting_rule"].empty_label = "Select a rule..."
+        self.fields["conditional_formatting_rule"].widget.attrs.update({
+            "id": "id_conditional_formatting_rule"
+        })
+        
+        # Add toggle behavior for conditional formatting
+        self.fields["use_conditional_formatting"].widget.attrs.update({
+            "id": "id_use_conditional_formatting",
+            "onchange": "toggleConditionalFormattingDropdown($(this))",
+            "class": "oh-switch__checkbox"
+        })
+        
+        # Make amount not required when using conditional formatting
+        self.fields["amount"].help_text = "Leave empty when using conditional formatting (the rule will calculate the amount)"
+        
         reload_queryset(self.fields)
         self.fields["style"].widget = widget.StyleWidget(form=self)
         for field_name, field in self.fields.items():
@@ -243,10 +316,27 @@ class DeductionForm(ModelForm):
         specific_employees = self.data.getlist("specific_employees")
         include_all = self.data.get("include_active_employees")
         condition_based = self.data.get("is_condition_based")
+        use_conditional = self.data.get("use_conditional_formatting")
+
+        # If using conditional formatting, amount is not required
+        if use_conditional:
+            if 'amount' in self.errors:
+                del self.errors['amount']
+            if not cleaned_data.get('amount'):
+                cleaned_data['amount'] = 0  # Set to 0, will be calculated by rule
 
         for field_name, field_instance in self.fields.items():
             if isinstance(field_instance, HorillaMultiSelectField):
                 self.errors.pop(field_name, None)
+                # Skip validation if using conditional formatting
+                if use_conditional:
+                    cleaned_data = super().clean()
+                    data = self.fields[field_name].queryset.filter(
+                        id__in=self.data.getlist(field_name)
+                    )
+                    cleaned_data[field_name] = data
+                    continue
+                    
                 if (
                     not specific_employees
                     and include_all is None
@@ -323,8 +413,15 @@ class DeductionForm(ModelForm):
         specific_employees = self.data.getlist("specific_employees")
         include_all = self.data.get("include_active_employees")
         condition_based = self.data.get("is_condition_based")
-        if not specific_employees and not include_all and not condition_based:
+        use_conditional = self.data.get("use_conditional_formatting")
+        
+        # If using conditional formatting, set include_active_employees to True
+        # The conditional rule will filter who actually gets it
+        if not specific_employees and not include_all and not condition_based and not use_conditional:
             self.instance.include_active_employees = True
+        elif use_conditional and not specific_employees and not include_all:
+            self.instance.include_active_employees = True
+            
         super().save(commit)
         other_conditions = self.data.getlist("other_conditions")
         other_fields = self.data.getlist("other_fields")
@@ -1054,3 +1151,5 @@ class PayslipAutoGenerateForm(ModelForm):
         context = {"form": self}
         table_html = render_to_string("common_form.html", context)
         return table_html
+
+

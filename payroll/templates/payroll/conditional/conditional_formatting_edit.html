@@ -1,0 +1,141 @@
+{% load i18n %}
+{% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{message.tags}}">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+        <span hx-get="{% url 'conditional-formatting-search' %}" hx-target="#FilingStatusList" hx-trigger="load"></span>
+    </div>
+{% endif %}
+<div class="oh-modal__dialog-header">
+    <span class="oh-modal__dialog-title">
+        <h5>{% trans "Edit Conditional Formatting Rule" %}</h5>
+    </span>
+    <button type="button" class="oh-modal__close" data-dismiss="oh-modal" aria-label="Close"
+        data-toggle="oh-modal-toggle">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+<div class="oh-modal__dialog-body conditional-formatting-form">
+    <form hx-post="{% url 'update-conditional-formatting' form.instance.id %}" hx-target="#objectCreateModalTarget">
+        {% csrf_token %} 
+        {{ form.as_p }}
+        <div class="oh-modal__dialog-footer">
+            <button type="submit" class="oh-btn oh-btn--secondary oh-btn--shadow">
+                {% trans "Update" %}
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .conditional-formatting-form .oh-input-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .conditional-formatting-form label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-weight: 400;
+        font-size: 0.8125rem;
+        color: #6b7280;
+    }
+    
+    .conditional-formatting-form input[type="text"],
+    .conditional-formatting-form select,
+    .conditional-formatting-form textarea {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        transition: border-color 0.15s ease-in-out;
+    }
+    
+    .conditional-formatting-form input[type="text"]:focus,
+    .conditional-formatting-form select:focus,
+    .conditional-formatting-form textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .conditional-formatting-form textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    .conditional-formatting-form .oh-modal__dialog-footer {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .conditional-formatting-form p {
+        margin-bottom: 1.5rem;
+    }
+    
+    .conditional-formatting-form p:last-of-type {
+        margin-bottom: 0;
+    }
+    
+    /* Hide help text */
+    .conditional-formatting-form .helptext {
+        display: none;
+    }
+</style>
+
+<iframe frameBorder="0" height="450px" id="oc-editor"
+    src="https://onecompiler.com/embed/python?codeChangeEvent=true&hideNew=true&hideNewFileOption=true&hideStdin=true&hideTitle=true&listenToEvents=true&availableLanguages=false&theme=dark"
+    width="100%">
+</iframe>
+
+<script>
+    var iFrame = document.getElementById('oc-editor');
+
+    // Make sure the iframe is fully loaded before sending the postMessage
+    iFrame.onload = function () {
+        // Populate the code in the OneCompiler editor
+        iFrame.contentWindow.postMessage({
+            eventType: 'populateCode',
+            language: 'python',
+            files: [
+                {
+                    "name": "conditional_formatting.py",
+                    "content": `{{form.instance.python_code|safe}}`
+                }
+            ]
+        }, "*");
+
+        // Trigger the code to run
+        iFrame.contentWindow.postMessage({
+            eventType: 'triggerRun'
+        }, "*");
+    };
+    
+    window.onmessage = function (e) {
+        if (e.data && e.data.language) {
+            code = e.data.files[0].content;
+            $("[name=python_code]").html(code);
+            
+            // Auto-save the code via AJAX
+            $.ajax({
+                url: "{% url 'update-conditional-code' form.instance.id %}",
+                type: "POST",
+                data: {
+                    code: code,
+                    csrfmiddlewaretoken: "{{ csrf_token }}"
+                },
+                success: function(response) {
+                    console.log("Code saved successfully");
+                }
+            });
+        }
+    };
+</script>

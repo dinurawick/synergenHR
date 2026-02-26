@@ -1,5 +1,6 @@
 {% load widget_tweaks %}
 {% load i18n %}
+{% load static %}
 <style>
     .condition-highlight {
         background-color: #ffa5000f;
@@ -45,6 +46,7 @@
         </div>
     </div>
 </div>
+<script src="{% static 'payroll/conditional_formatting_toggle.js' %}"></script>
 <script>
     $("#personal").closest(".oh-modal--show").find("button[aria-label='Close']").attr("style", "top: 33px; right: 20px; z-index:1");
 </script>
