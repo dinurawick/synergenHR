@@ -2209,13 +2209,6 @@ def user_leave_request(request, id):
         holiday_dates = holiday_dates_list(holidays)
         company_leaves = CompanyLeaves.objects.all()
         company_leave_dates = company_leave_dates_list(company_leaves, start_date)
-                for requested_date in requested_dates:
-                    if requested_date in holiday_dates:
-                        holiday_count += 1
-                requested_days = requested_days - holiday_count
-            if leave_type.exclude_company_leave == "yes":
-                company_leave_count = sum(
-                    requested_date in company_leave_dates
         
         # Collect all exclusions
         exclusions = set()
