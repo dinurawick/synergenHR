@@ -339,6 +339,7 @@ urlpatterns = [
         name="document-delete",
     ),
     path("organisation-chart/", views.organisation_chart, name="organisation-chart"),
+    path("company-tree/", views.company_tree_view, name="company-tree"),
     path("delete-policies", policies.delete_policies, name="delete-policies"),
     path(
         "disciplinary-actions/",

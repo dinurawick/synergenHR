@@ -431,6 +431,69 @@
 </script>
 
 <script src="{% static '/base/filter.js' %}"></script>
+
+<script>
+// Simple auto-calculate end date
+$(document).ready(function() {
+    console.log('[AUTO-CALC] Initializing...');
+    
+    // Use 'input' event for date fields (fires after value is set)
+    $(document).on('change input', '#id_leave_type_id, input[name="start_date"]', function() {
+        console.log('[AUTO-CALC] Field changed');
+        
+        setTimeout(function() {
+            var leaveTypeId = $('#id_leave_type_id').val();
+            
+            // Get the start_date input that actually has a value
+            var startDate = '';
+            $('input[name="start_date"]').each(function() {
+                if ($(this).val()) {
+                    startDate = $(this).val();
+                }
+            });
+            
+            console.log('[AUTO-CALC] Leave Type:', leaveTypeId, 'Start Date:', startDate);
+            
+            if (leaveTypeId && startDate) {
+                console.log('[AUTO-CALC] Making AJAX call...');
+                
+                $.ajax({
+                    url: '/leave/calculate-end-date',
+                    type: 'GET',
+                    data: {
+                        leave_type_id: leaveTypeId,
+                        start_date: startDate
+                    },
+                    success: function(response) {
+                        console.log('[AUTO-CALC] SUCCESS:', response);
+                        
+                        if (response.auto_calculate) {
+                            // Set end date on all end_date inputs
+                            $('input[name="end_date"]').val(response.end_date);
+                            $('#id_end_date').val(response.end_date);
+                            
+                            $('input[name="end_date"]').css('background-color', '#dbf30d');
+                            setTimeout(function() {
+                                $('input[name="end_date"]').css('background-color', '');
+                            }, 1000);
+                            console.log('[AUTO-CALC] ✓ End date set to:', response.end_date);
+                        } else {
+                            console.log('[AUTO-CALC] No auto-calc:', response.message || '40 days or less');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('[AUTO-CALC] ERROR:', error);
+                        console.error('[AUTO-CALC] Response:', xhr.responseText);
+                    }
+                });
+            } else {
+                console.log('[AUTO-CALC] Waiting for both fields...');
+            }
+        }, 200);
+    });
+});
+</script>
+
 <script
 type="module"
 src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"

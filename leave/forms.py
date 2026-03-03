@@ -134,6 +134,11 @@ class LeaveTypeForm(ConditionForm):
             "color": TextInput(attrs={"type": "color", "style": "height:40px;"}),
             "period_in": forms.HiddenInput(),
             "total_days": forms.HiddenInput(),
+            "require_approval": forms.Select(attrs={"id": "id_require_approval"}),
+            "require_attachment": forms.Select(attrs={"id": "id_require_attachment"}),
+            "exclude_company_leave": forms.Select(attrs={"id": "id_exclude_company_leave"}),
+            "exclude_holiday": forms.Select(attrs={"id": "id_exclude_holiday"}),
+            "exclude_weekends": forms.Select(attrs={"id": "id_exclude_weekends"}),
         }
 
     def clean(self):
@@ -197,6 +202,11 @@ class UpdateLeaveTypeForm(ConditionForm):
             "color": TextInput(attrs={"type": "color", "style": "height:40px;"}),
             "period_in": forms.HiddenInput(),
             "total_days": forms.HiddenInput(),
+            "require_approval": forms.Select(attrs={"id": "id_require_approval"}),
+            "require_attachment": forms.Select(attrs={"id": "id_require_attachment"}),
+            "exclude_company_leave": forms.Select(attrs={"id": "id_exclude_company_leave"}),
+            "exclude_holiday": forms.Select(attrs={"id": "id_exclude_holiday"}),
+            "exclude_weekends": forms.Select(attrs={"id": "id_exclude_weekends"}),
         }
 
     def clean(self):
@@ -247,6 +257,22 @@ class LeaveRequestCreationForm(BaseModelForm):
                 "hx-get": "/leave/employee-available-leave-count",
             }
         )
+        
+        # Filter cover employees to same department
+        if self.instance and self.instance.employee_id:
+            employee = self.instance.employee_id
+            if hasattr(employee, 'employee_work_info') and employee.employee_work_info.department_id:
+                department = employee.employee_work_info.department_id
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    employee_work_info__department_id=department,
+                    is_active=True
+                ).exclude(id=employee.id)
+            else:
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    is_active=True
+                ).exclude(id=employee.id)
+        else:
+            self.fields["cover_employee_id"].queryset = Employee.objects.filter(is_active=True)
 
     def as_p(self, *args, **kwargs):
         """
@@ -265,6 +291,7 @@ class LeaveRequestCreationForm(BaseModelForm):
             "start_date_breakdown",
             "end_date",
             "end_date_breakdown",
+            "cover_employee_id",
             "attachment",
             "description",
         ]
@@ -291,6 +318,18 @@ class LeaveRequestUpdationForm(BaseModelForm):
                 assigned_leave_types |= LeaveType.objects.filter(id=leave_type.id)
 
             self.fields["leave_type_id"].queryset = assigned_leave_types
+            
+            # Filter cover employees to same department
+            if hasattr(employee, 'employee_work_info') and employee.employee_work_info.department_id:
+                department = employee.employee_work_info.department_id
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    employee_work_info__department_id=department,
+                    is_active=True
+                ).exclude(id=employee.id)
+            else:
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    is_active=True
+                ).exclude(id=employee.id)
 
         self.fields["leave_type_id"].widget.attrs.update(
             {
@@ -337,6 +376,7 @@ class LeaveRequestUpdationForm(BaseModelForm):
             "start_date_breakdown",
             "end_date",
             "end_date_breakdown",
+            "cover_employee_id",
             "attachment",
             "description",
         ]
@@ -430,6 +470,7 @@ class AvailableLeaveUpdateForm(BaseModelForm):
 
 class UserLeaveRequestForm(BaseModelForm):
     description = forms.CharField(label=_("Description"), widget=forms.Textarea)
+    attachment = forms.FileField(label=_("Attachment"), required=False)
 
     def __init__(self, *args, **kwargs):
         leave_type = kwargs.pop("initial", None)
@@ -442,6 +483,19 @@ class UserLeaveRequestForm(BaseModelForm):
                 id__in=available_leaves.values_list("leave_type_id", flat=True)
             )
             self.fields["leave_type_id"].queryset = assigned_leave_types
+            
+            # Filter cover employees to same department
+            if hasattr(employee, 'employee_work_info') and employee.employee_work_info.department_id:
+                department = employee.employee_work_info.department_id
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    employee_work_info__department_id=department,
+                    is_active=True
+                ).exclude(id=employee.id)
+            else:
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    is_active=True
+                ).exclude(id=employee.id)
+        
         if leave_type:
             self.fields["leave_type_id"].queryset = LeaveType.objects.filter(
                 id=leave_type["leave_type_id"].id
@@ -470,6 +524,7 @@ class UserLeaveRequestForm(BaseModelForm):
             "start_date_breakdown",
             "end_date",
             "end_date_breakdown",
+            "cover_employee_id",
             "attachment",
             "description",
         ]
@@ -567,6 +622,19 @@ class UserLeaveRequestCreationForm(BaseModelForm):
                 id__in=available_leaves.values_list("leave_type_id", flat=True)
             )
             self.fields["leave_type_id"].queryset = assigned_leave_types
+            
+            # Filter cover employees to same department
+            if hasattr(employee, 'employee_work_info') and employee.employee_work_info.department_id:
+                department = employee.employee_work_info.department_id
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    employee_work_info__department_id=department,
+                    is_active=True
+                ).exclude(id=employee.id)
+            else:
+                self.fields["cover_employee_id"].queryset = Employee.objects.filter(
+                    is_active=True
+                ).exclude(id=employee.id)
+        
         self.fields["leave_type_id"].widget.attrs.update(
             {
                 "hx-include": "#userLeaveForm",
@@ -591,6 +659,7 @@ class UserLeaveRequestCreationForm(BaseModelForm):
             "start_date_breakdown",
             "end_date",
             "end_date_breakdown",
+            "cover_employee_id",
             "attachment",
             "description",
             "requested_days",

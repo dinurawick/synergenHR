@@ -238,6 +238,9 @@ class LeaveType(HorillaModel):
     exclude_holiday = models.CharField(
         max_length=30, choices=CHOICES, default="no", verbose_name=_("Exclude Holidays")
     )
+    exclude_weekends = models.CharField(
+        max_length=30, choices=CHOICES, default="no", verbose_name=_("Exclude Weekends")
+    )
     is_compensatory_leave = models.BooleanField(default=False)
     company_id = models.ForeignKey(
         Company, null=True, blank=True, on_delete=models.PROTECT
@@ -592,7 +595,7 @@ def leave_requested_dates(start_date, end_date):
 def cal_effective_requested_days(start_date, end_date, leave_type_id, requested_days):
     """
     Calculates the effective requested leave days by accounting for
-    holidays and company leave days.
+    holidays, company leave days, and weekends.
     """
     requested_dates = leave_requested_dates(start_date, end_date)
     holidays = set(holiday_dates_list(Holidays.objects.all()))
@@ -600,25 +603,24 @@ def cal_effective_requested_days(start_date, end_date, leave_type_id, requested_
         company_leave_dates_list(CompanyLeaves.objects.all(), start_date)
     )
 
-    if (
-        leave_type_id.exclude_company_leave == "yes"
-        and leave_type_id.exclude_holiday == "yes"
-    ):
-        total_leaves = holidays.union(company_leave_dates)
-        total_leave_count = sum(date in total_leaves for date in requested_dates)
-        return requested_days - total_leave_count
-
+    # Collect all exclusions
+    exclusions = set()
+    
     if leave_type_id.exclude_holiday == "yes":
-        holiday_count = sum(date in holidays for date in requested_dates)
-        requested_days -= holiday_count
-
+        exclusions.update(holidays)
+    
     if leave_type_id.exclude_company_leave == "yes":
-        company_leave_count = sum(
-            date in company_leave_dates for date in requested_dates
-        )
-        requested_days -= company_leave_count
-
-    return requested_days
+        exclusions.update(company_leave_dates)
+    
+    if leave_type_id.exclude_weekends == "yes":
+        # Weekends are already defined in company_leave_dates
+        # So we just use the company_leave_dates as weekend dates
+        exclusions.update(company_leave_dates)
+    
+    # Count excluded dates
+    excluded_count = sum(date in exclusions for date in requested_dates)
+    
+    return requested_days - excluded_count
 
 
 class LeaveRequest(HorillaModel):
@@ -654,6 +656,15 @@ class LeaveRequest(HorillaModel):
         blank=True,
         upload_to=upload_path,
         verbose_name=_("Attachment"),
+    )
+    cover_employee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="covering_leave_requests",
+        verbose_name=_("Cover Employee"),
+        help_text=_("Employee who will cover during this leave period"),
     )
     status = models.CharField(
         max_length=30,
@@ -840,10 +851,9 @@ class LeaveRequest(HorillaModel):
         )
         if (
             self.leave_type_id.exclude_company_leave == "yes"
-            and self.leave_type_id.exclude_holiday == "yes"
+            or self.leave_type_id.exclude_holiday == "yes"
+            or self.leave_type_id.exclude_weekends == "yes"
         ):
-            self.exclude_all_leaves()
-        else:
             self.exclude_leaves()
 
         if self.status in ["cancelled", "rejected"]:
@@ -1044,39 +1054,34 @@ class LeaveRequest(HorillaModel):
 
         return cleaned_data
 
-    def exclude_all_leaves(self):
+    def exclude_leaves(self):
+        """
+        Exclude holidays, company leaves, and weekends from requested days
+        """
         requested_dates = self.requested_dates()
-        holiday_dates = self.holiday_dates()
-        company_leave_dates = self.company_leave_dates()
-        total_leaves = list(set(holiday_dates + company_leave_dates))
-        total_leave_count = sum(
-            requested_date in total_leaves for requested_date in requested_dates
-        )
-        if (self.start_date in total_leaves or self.end_date in total_leaves) and (
+        exclusions = set()
+        
+        # Collect holidays
+        if self.leave_type_id.exclude_holiday == "yes":
+            holiday_dates = self.holiday_dates()
+            exclusions.update(holiday_dates)
+        
+        # Collect company leaves (weekends)
+        if self.leave_type_id.exclude_company_leave == "yes" or self.leave_type_id.exclude_weekends == "yes":
+            company_leave_dates = self.company_leave_dates()
+            exclusions.update(company_leave_dates)
+        
+        # Count excluded dates
+        excluded_count = sum(requested_date in exclusions for requested_date in requested_dates)
+        
+        # Adjust for half-day scenarios
+        if (self.start_date in exclusions or self.end_date in exclusions) and (
             self.start_date_breakdown == "second_half"
             or self.end_date_breakdown == "first_half"
         ):
             self.requested_days += 0.5
-
-        self.requested_days = self.requested_days - total_leave_count
-
-    def exclude_leaves(self):
-        holiday_count = 0
-        if self.leave_type_id.exclude_holiday == "yes":
-            requested_dates = self.requested_dates()
-            holiday_dates = self.holiday_dates()
-            for requested_date in requested_dates:
-                if requested_date in holiday_dates:
-                    holiday_count += 1
-            self.requested_days = self.requested_days - holiday_count
-        if self.leave_type_id.exclude_company_leave == "yes":
-            requested_dates = self.requested_dates()
-            company_leave_dates = self.company_leave_dates()
-            company_leave_count = sum(
-                requested_date in company_leave_dates
-                for requested_date in requested_dates
-            )
-            self.requested_days = self.requested_days - company_leave_count
+        
+        self.requested_days = self.requested_days - excluded_count
 
     def no_approval(self):
         employee_id = self.employee_id
@@ -1132,6 +1137,8 @@ class LeaveRequest(HorillaModel):
 
     def delete(self, *args, **kwargs):
         if self.status == "requested":
+            # Skip history tracking during delete to avoid field name issues
+            self.skip_history = True
             super().delete(*args, **kwargs)
 
             # Update the leave clashes count for all relevant leave requests

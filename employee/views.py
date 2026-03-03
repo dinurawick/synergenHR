@@ -3471,6 +3471,102 @@ def organisation_chart(request):
 
 
 @login_required
+def company_tree_view(request):
+    """
+    This method displays the ENTIRE company organizational tree
+    Shows all top-level managers and their complete hierarchies
+    """
+    selected_company = request.session.get("selected_company")
+    
+    # Helper function to recursively create the hierarchy structure
+    def create_hierarchy(manager):
+        """
+        Recursively build hierarchy tree for a manager
+        """
+        nodes = []
+        
+        # Get all direct subordinates
+        subordinates = Employee.objects.filter(
+            is_active=True, 
+            employee_work_info__reporting_manager_id=manager
+        ).exclude(id=manager.id).order_by('employee_first_name')
+
+        # Build node for each subordinate
+        for employee in subordinates:
+            nodes.append({
+                "name": employee.get_full_name(),
+                "title": getattr(
+                    employee.get_job_position(), "job_position", _("Not set")
+                ),
+                "department": getattr(
+                    employee.get_department(), "department", _("Not set")
+                ),
+                "className": "middle-level",
+                "children": create_hierarchy(employee),
+            })
+        
+        return nodes
+
+    # Find all top-level managers (employees with no reporting manager)
+    if selected_company and selected_company != "all":
+        top_managers = Employee.objects.filter(
+            is_active=True,
+            employee_work_info__reporting_manager_id__isnull=True,
+            employee_work_info__company_id=selected_company,
+        ).order_by('employee_first_name')
+    else:
+        top_managers = Employee.objects.filter(
+            is_active=True,
+            employee_work_info__reporting_manager_id__isnull=True,
+        ).order_by('employee_first_name')
+
+    # Build the complete tree structure
+    if top_managers.count() == 1:
+        # Single top manager - show as single tree
+        manager = top_managers.first()
+        tree_data = {
+            "name": manager.get_full_name(),
+            "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+            "department": getattr(manager.get_department(), "department", _("Not set")),
+            "children": create_hierarchy(manager),
+        }
+    elif top_managers.count() > 1:
+        # Multiple top managers - create a virtual root
+        children = []
+        for manager in top_managers:
+            children.append({
+                "name": manager.get_full_name(),
+                "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+                "department": getattr(manager.get_department(), "department", _("Not set")),
+                "children": create_hierarchy(manager),
+            })
+        
+        tree_data = {
+            "name": _("Company Organization"),
+            "title": _("All Departments"),
+            "department": "",
+            "className": "top-level",
+            "children": children,
+        }
+    else:
+        # No top managers found
+        tree_data = {
+            "name": _("No Organization Structure"),
+            "title": _("Please set reporting managers"),
+            "department": "",
+            "children": [],
+        }
+
+    context = {
+        "tree_data": json.dumps(tree_data),
+        "total_employees": Employee.objects.filter(is_active=True).count(),
+        "top_managers_count": top_managers.count(),
+    }
+    
+    return render(request, "organisation_chart/company_tree.html", context=context)
+
+
+@login_required
 @permission_required("payroll.add_encashmentgeneralsettings")
 def encashment_condition_create(request):
     """

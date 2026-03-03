@@ -2209,18 +2209,6 @@ def user_leave_request(request, id):
         holiday_dates = holiday_dates_list(holidays)
         company_leaves = CompanyLeaves.objects.all()
         company_leave_dates = company_leave_dates_list(company_leaves, start_date)
-        if (
-            leave_type.exclude_company_leave == "yes"
-            and leave_type.exclude_holiday == "yes"
-        ):
-            total_leaves = list(set(holiday_dates + company_leave_dates))
-            total_leave_count = sum(
-                requested_date in total_leaves for requested_date in requested_dates
-            )
-            requested_days = requested_days - total_leave_count
-        else:
-            holiday_count = 0
-            if leave_type.exclude_holiday == "yes":
                 for requested_date in requested_dates:
                     if requested_date in holiday_dates:
                         holiday_count += 1
@@ -2228,9 +2216,17 @@ def user_leave_request(request, id):
             if leave_type.exclude_company_leave == "yes":
                 company_leave_count = sum(
                     requested_date in company_leave_dates
-                    for requested_date in requested_dates
-                )
-                requested_days = requested_days - company_leave_count
+        
+        # Collect all exclusions
+        exclusions = set()
+        if leave_type.exclude_holiday == "yes":
+            exclusions.update(holiday_dates)
+        if leave_type.exclude_company_leave == "yes" or leave_type.exclude_weekends == "yes":
+            exclusions.update(company_leave_dates)
+        
+        # Count excluded dates
+        excluded_count = sum(requested_date in exclusions for requested_date in requested_dates)
+        requested_days = requested_days - excluded_count
 
         if form.is_valid():
             leave_request = form.save(commit=False)
@@ -2388,29 +2384,17 @@ def user_request_update(request, id):
                     company_leave_dates = company_leave_dates_list(
                         company_leaves, start_date
                     )
-                    if (
-                        leave_type.exclude_company_leave == "yes"
-                        and leave_type.exclude_holiday == "yes"
-                    ):
-                        total_leaves = list(set(holiday_dates + company_leave_dates))
-                        total_leave_count = sum(
-                            requested_date in total_leaves
-                            for requested_date in requested_dates
-                        )
-                        requested_days = requested_days - total_leave_count
-                    else:
-                        holiday_count = 0
-                        if leave_type.exclude_holiday == "yes":
-                            for requested_date in requested_dates:
-                                if requested_date in holiday_dates:
-                                    holiday_count += 1
-                            requested_days = requested_days - holiday_count
-                        if leave_type.exclude_company_leave == "yes":
-                            company_leave_count = sum(
-                                requested_date in company_leave_dates
-                                for requested_date in requested_dates
-                            )
-                            requested_days = requested_days - company_leave_count
+                    # Collect all exclusions
+                    exclusions = set()
+                    if leave_type.exclude_holiday == "yes":
+                        exclusions.update(holiday_dates)
+                    if leave_type.exclude_company_leave == "yes" or leave_type.exclude_weekends == "yes":
+                        exclusions.update(company_leave_dates)
+                    
+                    # Count excluded dates
+                    excluded_count = sum(requested_date in exclusions for requested_date in requested_dates)
+                    requested_days = requested_days - excluded_count
+                    
                     if requested_days <= available_total_leave:
                         leave_request.save()
                         messages.success(
@@ -2462,17 +2446,30 @@ def user_request_delete(request, id):
     previous_data = request.GET.urlencode()
     try:
         leave_request = LeaveRequest.objects.get(id=id)
-        if request.user.employee_get == leave_request.employee_id:
-            messages.success(request, _("Leave request deleted successfully.."))
+        employee = request.user.employee_get
+        
+        if employee == leave_request.employee_id:
             leave_request.delete()
+            messages.success(request, _("Leave request deleted successfully.."))
+        else:
+            messages.error(request, _("You can only delete your own leave requests"))
+            
     except LeaveRequest.DoesNotExist:
-        messages.error(request, _("User has no leave request.."))
+        messages.error(request, _("Leave request not found"))
     except ProtectedError:
-        messages.error(request, _("Related entries exists"))
-    if not LeaveRequest.objects.filter(employee_id=request.user.employee_get):
+        messages.error(request, _("Cannot delete - related entries exist"))
+    except AttributeError:
+        messages.error(request, _("User is not an employee"))
+    except Exception as e:
+        messages.error(request, _("Error deleting leave request: ") + str(e))
+    
+    try:
+        if not LeaveRequest.objects.filter(employee_id=request.user.employee_get):
+            return HttpResponse("<script>window.location.reload();</script>")
+        else:
+            return redirect(f"/leave/user-request-filter?{previous_data}")
+    except:
         return HttpResponse("<script>window.location.reload();</script>")
-    else:
-        return redirect(f"/leave/user-request-filter?{previous_data}")
 
 
 @login_required
@@ -3245,6 +3242,80 @@ def leave_request_create(request):
             "pd": previous_data,
         },
     )
+
+
+@login_required
+def calculate_end_date_ajax(request):
+    """
+    AJAX endpoint to calculate end date based on start date and leave type
+    Only for leave types with more than 40 days
+    """
+    from datetime import datetime, timedelta
+    
+    try:
+        start_date_str = request.GET.get('start_date')
+        leave_type_id = request.GET.get('leave_type_id')
+        
+        if not start_date_str or not leave_type_id:
+            return JsonResponse({'error': 'Missing parameters'}, status=400)
+        
+        # Get leave type
+        leave_type = LeaveType.objects.get(id=leave_type_id)
+        total_days = int(leave_type.total_days)
+        
+        # Only auto-calculate if more than 40 days
+        if total_days <= 40:
+            return JsonResponse({
+                'auto_calculate': False,
+                'message': 'Leave type has 40 days or less'
+            })
+        
+        # Parse start date
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        
+        # Get exclusion settings
+        exclude_holidays = leave_type.exclude_holiday == 'yes'
+        exclude_company_leave = leave_type.exclude_company_leave == 'yes'
+        exclude_weekends = leave_type.exclude_weekends == 'yes'
+        
+        # Calculate end date
+        current_date = start_date
+        days_counted = 0
+        
+        # Get holidays and company leaves if needed
+        excluded_dates = set()
+        
+        if exclude_holidays:
+            holidays = Holidays.objects.all()
+            holiday_dates = holiday_dates_list(holidays)
+            excluded_dates.update(holiday_dates)
+        
+        if exclude_company_leave or exclude_weekends:
+            company_leaves = CompanyLeaves.objects.all()
+            company_leave_dates = company_leave_dates_list(company_leaves, start_date)
+            excluded_dates.update(company_leave_dates)
+        
+        # Count days until we reach total_days
+        while days_counted < total_days:
+            if current_date not in excluded_dates:
+                days_counted += 1
+            
+            if days_counted < total_days:
+                current_date += timedelta(days=1)
+        
+        return JsonResponse({
+            'auto_calculate': True,
+            'end_date': current_date.strftime('%Y-%m-%d'),
+            'total_days': total_days,
+            'exclude_holidays': exclude_holidays,
+            'exclude_company_leave': exclude_company_leave,
+            'exclude_weekends': exclude_weekends
+        })
+        
+    except LeaveType.DoesNotExist:
+        return JsonResponse({'error': 'Leave type not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required

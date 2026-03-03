@@ -1,0 +1,534 @@
+    {% extends 'index.html' %}
+{% block content %}
+{% load i18n %}
+
+<main :class="sidebarOpen ? 'oh-main__sidebar-visible' : ''">
+    <section class="oh-wrapper oh-main__topbar" x-data="{searchShow: false}">
+        <div class="oh-main__titlebar oh-main__titlebar--left">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h1 class="oh-main__titlebar-title fw-bold">{% trans "Complete Company Tree" %}</h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span class="badge" style="background-color: #0a0a5a; color: white; padding: 5px 10px; border-radius: 4px;">
+                        <ion-icon name="people-outline" style="vertical-align: middle;"></ion-icon>
+                        {{ total_employees }} {% trans "Employees" %}
+                    </span>
+                    <span class="badge" style="background-color: #dbf30d; color: #0a0a5a; padding: 5px 10px; border-radius: 4px;">
+                        <ion-icon name="business-outline" style="vertical-align: middle;"></ion-icon>
+                        {{ top_managers_count }} {% trans "Top Level" %}
+                    </span>
+                </div>
+            </div>
+            <a class="oh-main__titlebar-search-toggle" role="button" aria-label="Toggle Search"
+                @click="searchShow = !searchShow">
+                <ion-icon name="search-outline" class="oh-main__titlebar-serach-icon"></ion-icon>
+            </a>
+        </div>
+        <div class="oh-main__titlebar oh-main__titlebar--right">
+            <div class="oh-input-group oh-input__search-group"
+                :class="searchShow ? 'oh-input__search-group--show' : ''">
+                <ion-icon name="search-outline" class="oh-input-group__icon oh-input-group__icon--left"></ion-icon>
+                <input type="text" class="oh-input oh-input__icon" aria-label="Search Input" 
+                       placeholder="{% trans 'Search employees...' %}" id="key-word" />
+            </div>
+            <div style="margin-left: 10px;">
+                <a href="{% url 'organisation-chart' %}" class="oh-btn oh-btn--secondary" 
+                   style="text-decoration: none;">
+                    <ion-icon name="person-outline" style="vertical-align: middle;"></ion-icon>
+                    {% trans "My View" %}
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <div class="oh-wrapper" style="padding: 20px;">
+        <div class="oh-alert oh-alert--info mb-3" style="display: flex; align-items: center; gap: 10px;">
+            <ion-icon name="information-circle-outline" style="font-size: 24px;"></ion-icon>
+            <div>
+                <strong>{% trans "Complete Organization View" %}</strong><br>
+                <small>{% trans "This shows the entire company structure from all top-level managers down. Click on any node to expand/collapse." %}</small>
+            </div>
+        </div>
+        
+        <!-- Navigation Controls -->
+        <div class="tree-controls" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+            <button id="centerBtn" class="oh-btn oh-btn--primary" style="display: flex; align-items: center; gap: 5px;">
+                <ion-icon name="locate-outline"></ion-icon>
+                {% trans "Center View" %}
+            </button>
+            <button id="zoomInBtn" class="oh-btn oh-btn--secondary" style="display: flex; align-items: center; gap: 5px;">
+                <ion-icon name="add-outline"></ion-icon>
+                {% trans "Zoom In" %}
+            </button>
+            <button id="zoomOutBtn" class="oh-btn oh-btn--secondary" style="display: flex; align-items: center; gap: 5px;">
+                <ion-icon name="remove-outline"></ion-icon>
+                {% trans "Zoom Out" %}
+            </button>
+            <button id="resetZoomBtn" class="oh-btn oh-btn--secondary" style="display: flex; align-items: center; gap: 5px;">
+                <ion-icon name="contract-outline"></ion-icon>
+                {% trans "Reset Zoom" %}
+            </button>
+            <button id="expandAllBtn" class="oh-btn oh-btn--secondary" style="display: flex; align-items: center; gap: 5px;">
+                <ion-icon name="expand-outline"></ion-icon>
+                {% trans "Expand All" %}
+            </button>
+            <button id="collapseAllBtn" class="oh-btn oh-btn--secondary" style="display: flex; align-items: center; gap: 5px;">
+                <ion-icon name="contract-outline"></ion-icon>
+                {% trans "Collapse All" %}
+            </button>
+        </div>
+        
+        <!-- Directional Navigation -->
+        <div class="directional-nav" style="position: fixed; bottom: 30px; right: 30px; z-index: 1000; background: white; border-radius: 8px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <div style="display: grid; grid-template-columns: repeat(3, 40px); gap: 5px;">
+                <div></div>
+                <button id="navUp" class="nav-btn" style="grid-column: 2;">
+                    <ion-icon name="chevron-up-outline"></ion-icon>
+                </button>
+                <div></div>
+                <button id="navLeft" class="nav-btn" style="grid-column: 1;">
+                    <ion-icon name="chevron-back-outline"></ion-icon>
+                </button>
+                <button id="navCenter" class="nav-btn" style="grid-column: 2; background: #0a0a5a; color: white;">
+                    <ion-icon name="radio-button-on-outline"></ion-icon>
+                </button>
+                <button id="navRight" class="nav-btn" style="grid-column: 3;">
+                    <ion-icon name="chevron-forward-outline"></ion-icon>
+                </button>
+                <div></div>
+                <button id="navDown" class="nav-btn" style="grid-column: 2;">
+                    <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <div></div>
+            </div>
+        </div>
+        
+        <!-- Chart Container with Scrollbars -->
+        <div id="chart-wrapper" style="width: 100%; height: 600px; overflow: auto; border: 2px solid #e0e0e0; border-radius: 8px; background: #f8f9fa; position: relative;">
+            <div id="chart-container" class="oh-main__org-chart-container"></div>
+        </div>
+    </div>
+</main>
+
+<style>
+    /* Enhanced styling for the company tree */
+    .orgchart {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        min-width: 100%;
+        min-height: 100%;
+    }
+    
+    .orgchart .node {
+        background-color: #fff;
+        border: 2px solid #0a0a5a;
+        border-radius: 8px;
+        padding: 10px 15px;
+        min-width: 150px;
+        max-width: 200px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    .orgchart .node:hover {
+        background-color: #f8f9fa;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .orgchart .node .title {
+        font-weight: bold;
+        color: #0a0a5a;
+        font-size: 14px;
+        margin-bottom: 5px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+    }
+    
+    .orgchart .node .content {
+        color: #6c757d;
+        font-size: 12px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        line-height: 1.4;
+    }
+    
+    .orgchart .node.top-level {
+        background: linear-gradient(135deg, #0a0a5a 0%, #1a1a7a 100%);
+        color: white;
+        border: none;
+    }
+    
+    .orgchart .node.top-level .title,
+    .orgchart .node.top-level .content {
+        color: white;
+    }
+    
+    .orgchart .node.middle-level {
+        border-color: #dbf30d;
+    }
+    
+    .orgchart .lines .downLine {
+        background-color: #0a0a5a;
+    }
+    
+    .orgchart .lines .leftLine,
+    .orgchart .lines .rightLine,
+    .orgchart .lines .topLine {
+        border-color: #0a0a5a;
+    }
+    
+    /* Matched nodes during search */
+    .orgchart .node.matched {
+        background-color: #dbf30d;
+        border-color: #0a0a5a;
+    }
+    
+    .orgchart .node.matched .title {
+        color: #0a0a5a;
+    }
+    
+    /* Navigation buttons */
+    .nav-btn {
+        width: 40px;
+        height: 40px;
+        border: 2px solid #0a0a5a;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    
+    .nav-btn:hover {
+        background: #0a0a5a;
+        color: white;
+        transform: scale(1.1);
+    }
+    
+    .nav-btn ion-icon {
+        font-size: 20px;
+    }
+    
+    /* Chart wrapper scrollbars */
+    #chart-wrapper::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+    
+    #chart-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 6px;
+    }
+    
+    #chart-wrapper::-webkit-scrollbar-thumb {
+        background: #0a0a5a;
+        border-radius: 6px;
+    }
+    
+    #chart-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #1a1a7a;
+    }
+    
+    /* Loading state */
+    #chart-container:empty::before {
+        content: "{% trans 'Loading organization tree...' %}";
+        display: block;
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+        font-size: 16px;
+    }
+    
+    /* Smooth scrolling */
+    #chart-wrapper {
+        scroll-behavior: smooth;
+    }
+</style>
+
+<script>
+    var treeData = {{ tree_data|safe }};
+    var $chartWrapper = $('#chart-wrapper');
+    var $chartContainer = $('#chart-container');
+    var zoomLevel = 1;
+    var panStep = 100; // pixels to move per arrow click
+    
+    function loopChart($hierarchy) {
+        var $siblings = $hierarchy.children('.nodes').children('.hierarchy');
+        if ($siblings.length) {
+            $siblings.filter(':not(.hidden)').first().addClass('first-shown')
+                .end().last().addClass('last-shown');
+        }
+        $siblings.each(function (index, sibling) {
+            loopChart($(sibling));
+        });
+    }
+    
+    function centerView() {
+        // Center the chart in the viewport
+        var wrapperWidth = $chartWrapper.width();
+        var wrapperHeight = $chartWrapper.height();
+        var chartWidth = $chartContainer.width();
+        var chartHeight = $chartContainer.height();
+        
+        var scrollLeft = (chartWidth - wrapperWidth) / 2;
+        var scrollTop = (chartHeight - wrapperHeight) / 2;
+        
+        $chartWrapper.animate({
+            scrollLeft: Math.max(0, scrollLeft),
+            scrollTop: Math.max(0, scrollTop)
+        }, 300);
+    }
+    
+    function zoomIn() {
+        zoomLevel = Math.min(zoomLevel + 0.1, 2);
+        applyZoom();
+    }
+    
+    function zoomOut() {
+        zoomLevel = Math.max(zoomLevel - 0.1, 0.5);
+        applyZoom();
+    }
+    
+    function resetZoom() {
+        zoomLevel = 1;
+        applyZoom();
+        centerView();
+    }
+    
+    function applyZoom() {
+        $('.orgchart').css('transform', 'scale(' + zoomLevel + ')');
+        $('.orgchart').css('transform-origin', 'top left');
+    }
+    
+    function filterNodes(keyWord) {
+        if (!keyWord.length) {
+            // Reset view if search is cleared
+            $('#chart-container').empty();
+            initChart();
+            return;
+        }
+        
+        var $chart = $('.orgchart');
+        
+        // Clear previous search results
+        $chart.find('.node').removeClass('matched retained');
+        $chart.find('.hierarchy').removeClass('hidden');
+        
+        // Enable expand/collapse during search
+        $chart.removeClass('noncollapsable');
+        
+        // Find and mark matched nodes
+        $chart.find('.node').filter(function (index, node) {
+            return $(node).text().toLowerCase().indexOf(keyWord) > -1;
+        }).addClass('matched')
+            .closest('.hierarchy').parents('.hierarchy').children('.node').addClass('retained');
+        
+        // Hide unmatched nodes
+        $chart.find('.node:not(.matched):not(.retained)')
+            .closest('.hierarchy').addClass('hidden');
+        
+        // Show path to matched nodes
+        $chart.find('.matched,.retained').each(function (index, node) {
+            $(node).removeClass('slide-up')
+                .closest('.nodes').removeClass('hidden')
+                .siblings('.hierarchy').removeClass('isChildrenCollapsed');
+        });
+        
+        // Hide children of matched nodes if they don't contain matches
+        $chart.find('.matched').each(function (index, node) {
+            if (!$(node).siblings('.nodes').find('.matched').length) {
+                $(node).siblings('.nodes').addClass('hidden')
+                    .parent().addClass('isChildrenCollapsed');
+            }
+        });
+        
+        loopChart($chart.find('.hierarchy:first'));
+    }
+    
+    function initChart() {
+        $chartContainer.orgchart({
+            'data': treeData,
+            'visibleLevel': 3,
+            'nodeContent': 'title',
+            'direction': 't2b',
+            'pan': false, // Disable built-in pan, use our scrollbars
+            'zoom': false, // Disable built-in zoom, use our controls
+            'nodeTemplate': function(data) {
+                var html = '<div class="title">' + data.name + '</div>';
+                html += '<div class="content">' + data.title + '</div>';
+                if (data.department) {
+                    html += '<div class="content" style="font-size: 11px; margin-top: 3px;">' + data.department + '</div>';
+                }
+                return html;
+            }
+        });
+        
+        // Auto-center after chart is rendered
+        setTimeout(function() {
+            centerView();
+        }, 500);
+        
+        // Add click handler to nodes for auto-centering on expand
+        $('.orgchart').on('click', '.node', function(e) {
+            var $node = $(this);
+            
+            // Wait for expand/collapse animation
+            setTimeout(function() {
+                // Scroll to the clicked node
+                var nodeOffset = $node.offset();
+                var wrapperOffset = $chartWrapper.offset();
+                var wrapperWidth = $chartWrapper.width();
+                var wrapperHeight = $chartWrapper.height();
+                
+                var scrollLeft = $chartWrapper.scrollLeft() + (nodeOffset.left - wrapperOffset.left) - (wrapperWidth / 2) + ($node.width() / 2);
+                var scrollTop = $chartWrapper.scrollTop() + (nodeOffset.top - wrapperOffset.top) - (wrapperHeight / 2) + ($node.height() / 2);
+                
+                $chartWrapper.animate({
+                    scrollLeft: scrollLeft,
+                    scrollTop: scrollTop
+                }, 300);
+            }, 100);
+        });
+    }
+    
+    $(document).ready(function() {
+        // Initialize the chart
+        initChart();
+        
+        // Center button
+        $('#centerBtn').on('click', function() {
+            centerView();
+        });
+        
+        // Zoom controls
+        $('#zoomInBtn').on('click', function() {
+            zoomIn();
+        });
+        
+        $('#zoomOutBtn').on('click', function() {
+            zoomOut();
+        });
+        
+        $('#resetZoomBtn').on('click', function() {
+            resetZoom();
+        });
+        
+        // Expand/Collapse all
+        $('#expandAllBtn').on('click', function() {
+            $('.orgchart').find('.hierarchy').removeClass('hidden');
+            $('.orgchart').find('.node').removeClass('slide-up');
+        });
+        
+        $('#collapseAllBtn').on('click', function() {
+            $('.orgchart').find('.hierarchy').not(':first').addClass('hidden');
+        });
+        
+        // Directional navigation
+        $('#navUp').on('click', function() {
+            $chartWrapper.animate({
+                scrollTop: $chartWrapper.scrollTop() - panStep
+            }, 200);
+        });
+        
+        $('#navDown').on('click', function() {
+            $chartWrapper.animate({
+                scrollTop: $chartWrapper.scrollTop() + panStep
+            }, 200);
+        });
+        
+        $('#navLeft').on('click', function() {
+            $chartWrapper.animate({
+                scrollLeft: $chartWrapper.scrollLeft() - panStep
+            }, 200);
+        });
+        
+        $('#navRight').on('click', function() {
+            $chartWrapper.animate({
+                scrollLeft: $chartWrapper.scrollLeft() + panStep
+            }, 200);
+        });
+        
+        $('#navCenter').on('click', function() {
+            centerView();
+        });
+        
+        // Search functionality
+        $('#key-word').on('keyup', function (event) {
+            var keyword = this.value.toLowerCase().trim();
+            
+            if (event.which === 13) {
+                filterNodes(keyword);
+            } else if (event.which === 8 && keyword.length === 0) {
+                filterNodes('');
+            } else if (keyword.length >= 2) {
+                filterNodes(keyword);
+            } else if (keyword.length === 0) {
+                filterNodes('');
+            }
+        });
+        
+        // Mouse wheel zoom (with Ctrl key)
+        $chartWrapper.on('wheel', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                var delta = e.originalEvent.deltaY;
+                
+                if (delta < 0) {
+                    zoomIn();
+                } else {
+                    zoomOut();
+                }
+            }
+        });
+        
+        // Keyboard shortcuts
+        $(document).on('keydown', function(e) {
+            // Only if not typing in search box
+            if (!$('#key-word').is(':focus')) {
+                switch(e.key) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        $('#navUp').click();
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        $('#navDown').click();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        $('#navLeft').click();
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        $('#navRight').click();
+                        break;
+                    case 'c':
+                    case 'C':
+                        centerView();
+                        break;
+                    case '+':
+                    case '=':
+                        zoomIn();
+                        break;
+                    case '-':
+                    case '_':
+                        zoomOut();
+                        break;
+                    case '0':
+                        resetZoom();
+                        break;
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}

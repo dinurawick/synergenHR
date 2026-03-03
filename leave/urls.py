@@ -178,6 +178,9 @@ urlpatterns = [
         "leave-request-create", views.leave_request_create, name="leave-request-create"
     ),
     path(
+        "calculate-end-date", views.calculate_end_date_ajax, name="calculate-end-date"
+    ),
+    path(
         "leave-allocation-request-view/",
         views.leave_allocation_request_view,
         name="leave-allocation-request-view",

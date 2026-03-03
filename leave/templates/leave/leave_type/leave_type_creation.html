@@ -17,7 +17,7 @@
 
 <div class="oh-wrapper d-flex justify-content-center">
     <div class="oh-onboarding-card">
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" onsubmit="checkYesOrNoFields()">
             {% csrf_token %}
             <div class="oh-onboarding-card__address-group">
                 <h2 class="oh-onboarding-card__section-title">{% trans "Create Leave Type" %}</h2>
@@ -235,6 +235,19 @@
                     <div class="col-sm-12 col-md-12 col-lg-6">
                         <div class="oh-input-group oh-label__info  justify-content-between">
                             <div class="d-flex align-items-center">
+                                <label for="" class="oh-label">{{ form.exclude_weekends.label }}</label>
+                                <span class=" oh-info me-3"
+                                    title="{% trans 'Do you need to exclude weekends from the requested leave days?' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3 ">
+                                <input type="checkbox" class="oh-switch__checkbox yesOrNo" id="id_exclude_weekends_toggle">
+                                {{form.exclude_weekends.errors}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info  justify-content-between">
+                            <div class="d-flex align-items-center">
                                 <label for="" class="oh-label">{{ form.is_encashable.label }}</label>
                                 <span class=" oh-info me-3"
                                     title="{% trans 'Do you need to encash pending leave days?' %}"></span>
@@ -260,6 +273,7 @@
                     <div hidden>{{form.require_attachment}}</div>
                     <div hidden>{{form.exclude_company_leave}}</div>
                     <div hidden>{{form.exclude_holiday}}</div>
+                    <div hidden>{{form.exclude_weekends}}</div>
 
                 </div>
             </div>
@@ -502,6 +516,11 @@
         } else {
             $("#id_exclude_holiday").val("no");
         }
+        if ($("#id_exclude_weekends_toggle").is(":checked")) {
+            $("#id_exclude_weekends").val("yes");
+        } else {
+            $("#id_exclude_weekends").val("no");
+        }
     }
 
     $(".yesOrNo").change(function () {
@@ -509,6 +528,9 @@
     });
 
     $(document).ready(function () {
+        // Initialize all yes/no fields on page load
+        checkYesOrNoFields();
+        
         // Select All Employees Functionality
         $("#select-all-employees").change(function () {
             var isChecked = $(this).prop("checked");

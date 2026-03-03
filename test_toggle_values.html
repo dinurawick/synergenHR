@@ -1,0 +1,42 @@
+<!-- Add this temporarily to your leave type creation form to debug -->
+<!-- Place it right before the submit button -->
+
+<div style="background: #f0f0f0; padding: 20px; margin: 20px 0; border: 2px solid #333;">
+    <h3>DEBUG INFO (Remove this after testing)</h3>
+    
+    <p><strong>Exclude Weekends Toggle:</strong> <span id="debug_toggle"></span></p>
+    <p><strong>Exclude Weekends Hidden Field:</strong> <span id="debug_hidden"></span></p>
+    
+    <button type="button" onclick="showDebugInfo()" style="padding: 10px; background: #007bff; color: white; border: none; cursor: pointer;">
+        Check Values
+    </button>
+</div>
+
+<script>
+function showDebugInfo() {
+    var toggleChecked = $("#id_exclude_weekends_toggle").is(":checked");
+    var hiddenValue = $("#id_exclude_weekends").val();
+    
+    $("#debug_toggle").text(toggleChecked ? "CHECKED (ON)" : "UNCHECKED (OFF)");
+    $("#debug_hidden").text(hiddenValue || "EMPTY/UNDEFINED");
+    
+    console.log("Toggle element:", $("#id_exclude_weekends_toggle"));
+    console.log("Toggle checked:", toggleChecked);
+    console.log("Hidden field element:", $("#id_exclude_weekends"));
+    console.log("Hidden field value:", hiddenValue);
+    
+    alert("Toggle: " + (toggleChecked ? "ON" : "OFF") + "\nHidden Field: " + (hiddenValue || "EMPTY"));
+}
+
+// Auto-check on page load
+$(document).ready(function() {
+    setTimeout(showDebugInfo, 1000);
+    
+    // Also check when toggle changes
+    $("#id_exclude_weekends_toggle").change(function() {
+        console.log("Toggle changed!");
+        checkYesOrNoFields();
+        setTimeout(showDebugInfo, 100);
+    });
+});
+</script>

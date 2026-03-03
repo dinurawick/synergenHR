@@ -227,3 +227,6 @@ deployment/db_backup.sh
 deployment/.env.production
 *.production
 *.sh
+*.md
+*.bat
+*.txt
