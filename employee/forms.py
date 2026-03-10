@@ -37,6 +37,8 @@ from django.utils.translation import gettext_lazy as trans
 from base.methods import eval_validate, reload_queryset
 from employee.models import (
     Actiontype,
+    Bank,
+    BankBranch,
     BonusPoint,
     DisciplinaryAction,
     Employee,
@@ -442,10 +444,10 @@ class EmployeeWorkInformationUpdateForm(ModelForm):
 
 class EmployeeBankDetailsForm(ModelForm):
     """
-    Form for EmployeeBankDetails model
+    Form for EmployeeBankDetails model with cascading bank/branch dropdowns
     """
 
-    address = forms.CharField(widget=forms.Textarea(attrs={"rows": 2, "cols": 40}))
+    address = forms.CharField(widget=forms.Textarea(attrs={"rows": 2, "cols": 40}), required=False)
 
     class Meta:
         """
@@ -453,23 +455,36 @@ class EmployeeBankDetailsForm(ModelForm):
         """
 
         model = EmployeeBankDetails
-        fields = (
-            "bank_name",
+        fields = [
+            "bank",
+            "bank_branch",
             "account_number",
-            "branch",
             "any_other_code1",
+            "any_other_code2",
             "address",
             "country",
             "state",
             "city",
-            "any_other_code2",
-        )
-        exclude = ["employee_id", "is_active", "additional_info"]
+        ]
+        widgets = {
+            "bank": forms.Select(attrs={"class": "oh-select w-100", "id": "id_bank"}),
+            "bank_branch": forms.Select(attrs={"class": "oh-select w-100", "id": "id_bank_branch"}),
+            "any_other_code1": forms.TextInput(attrs={"class": "oh-input w-100", "readonly": "readonly"}),
+            "any_other_code2": forms.TextInput(attrs={"class": "oh-input w-100", "readonly": "readonly"}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["address"].widget.attrs["autocomplete"] = "address"
+        self.fields['address'].required = False
+        self.fields['any_other_code1'].required = False
+        self.fields['any_other_code2'].required = False
+        self.fields['bank'].required = False
+        self.fields['bank_branch'].required = False
+        
         for visible in self.visible_fields():
+            if visible.field.widget.attrs.get("class"):
+                continue
             visible.field.widget.attrs["class"] = "oh-input w-100"
 
     def as_p(self, *args, **kwargs):
@@ -479,7 +494,7 @@ class EmployeeBankDetailsForm(ModelForm):
 
 class EmployeeBankDetailsUpdateForm(ModelForm):
     """
-    Form for EmployeeBankDetails model
+    Form for EmployeeBankDetails model with cascading bank/branch dropdowns
     """
 
     class Meta:
@@ -488,15 +503,41 @@ class EmployeeBankDetailsUpdateForm(ModelForm):
         """
 
         model = EmployeeBankDetails
-        fields = "__all__"
-        exclude = ["employee_id", "is_active", "additional_info"]
+        fields = [
+            "bank",
+            "bank_branch", 
+            "account_number",
+            "any_other_code1",
+            "any_other_code2",
+            "address",
+            "country",
+            "state",
+            "city",
+        ]
+        widgets = {
+            "bank": forms.Select(attrs={"class": "oh-select w-100", "id": "id_bank"}),
+            "bank_branch": forms.Select(attrs={"class": "oh-select w-100", "id": "id_bank_branch"}),
+            "any_other_code1": forms.TextInput(attrs={"class": "oh-input w-100", "readonly": "readonly"}),
+            "any_other_code2": forms.TextInput(attrs={"class": "oh-input w-100", "readonly": "readonly"}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Make fields not required
+        self.fields['address'].required = False
+        self.fields['any_other_code1'].required = False
+        self.fields['any_other_code2'].required = False
+        self.fields['bank'].required = False
+        self.fields['bank_branch'].required = False
+        
         for visible in self.visible_fields():
+            if visible.field.widget.attrs.get("class"):
+                continue
             visible.field.widget.attrs["class"] = "oh-input w-100"
+        
         for field in self.fields:
-            self.fields[field].widget.attrs["placeholder"] = self.fields[field].label
+            if field not in ["bank", "bank_branch", "any_other_code1", "any_other_code2"]:
+                self.fields[field].widget.attrs["placeholder"] = self.fields[field].label
 
     def as_p(self, *args, **kwargs):
         context = {"form": self}
@@ -805,3 +846,67 @@ class EmployeeGeneralSettingPrefixForm(forms.ModelForm):
             "badge_id_prefix": forms.TextInput(attrs={"class": "oh-input w-100"}),
             "company_id": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
         }
+
+
+
+class BankForm(ModelForm):
+    """
+    Form for Bank model
+    """
+
+    class Meta:
+        model = Bank
+        fields = ["name", "country", "code"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "country": forms.Select(attrs={
+                "class": "w-100",
+                "id": "bank_country_select",  # Custom ID to prevent conflicts with global country.js
+                "style": "padding: 0.625rem 0.875rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;"
+            }),
+            "code": forms.TextInput(attrs={"class": "oh-input w-100"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs["placeholder"] = _("Enter bank name")
+        self.fields["code"].widget.attrs["placeholder"] = _("Enter bank code")
+        # Remove empty label since country is required
+        self.fields["country"].empty_label = None
+
+
+class BankBranchForm(ModelForm):
+    """
+    Form for BankBranch model
+    """
+
+    class Meta:
+        model = BankBranch
+        fields = [
+            "bank",
+            "name",
+            "branch_code",
+            "bank_code_1",
+            "bank_code_2",
+            "address",
+            "city",
+            "state",
+        ]
+        widgets = {
+            "bank": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "branch_code": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "bank_code_1": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "bank_code_2": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "address": forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+            "city": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "state": forms.TextInput(attrs={"class": "oh-input w-100"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs["placeholder"] = _("Enter branch name")
+        self.fields["branch_code"].widget.attrs["placeholder"] = _("Enter branch code")
+        self.fields["bank_code_1"].widget.attrs["placeholder"] = _("Enter primary bank code")
+        self.fields["bank_code_2"].widget.attrs["placeholder"] = _("Enter secondary bank code (optional)")
+        self.fields["bank_code_2"].required = False

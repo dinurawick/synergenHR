@@ -275,6 +275,38 @@
             </tbody>
           </table>
 
+          {% if employee.employee_bank_details.bank %}
+          <table class="oh-payslip-table w-100 mt-4">
+            <thead>
+              <tr class="oh-bg-color">
+                <th colspan="2">{% trans "Bank Details" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="w-50">
+                  <span class="oh-payslip-td-head">{% trans "Bank Name :" %}</span>
+                  <span class="oh-payslip-td-value">{{employee.employee_bank_details.bank.name}}</span>
+                </td>
+                <td class="w-50">
+                  <span class="oh-payslip-td-head">{% trans "Branch :" %}</span>
+                  <span class="oh-payslip-td-value">{% if employee.employee_bank_details.bank_branch %}{{employee.employee_bank_details.bank_branch.name}}{% else %}-{% endif %}</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-50">
+                  <span class="oh-payslip-td-head">{% trans "Bank Code #1 :" %}</span>
+                  <span class="oh-payslip-td-value">{% if employee.employee_bank_details.any_other_code1 %}{{employee.employee_bank_details.any_other_code1}}{% else %}-{% endif %}</span>
+                </td>
+                <td class="w-50">
+                  <span class="oh-payslip-td-head">{% trans "Bank Code #2 :" %}</span>
+                  <span class="oh-payslip-td-value">{% if employee.employee_bank_details.any_other_code2 %}{{employee.employee_bank_details.any_other_code2}}{% else %}-{% endif %}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          {% endif %}
+
           <table class="w-100 oh-allowance-table mt-4">
             <thead>
               <tr class="oh-bg-color">

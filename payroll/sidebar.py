@@ -55,6 +55,23 @@ SUBMENUS = [
         "redirect": reverse("filing-status-view"),
         "accessibility": "payroll.sidebar.federal_tax_accessibility",
     },
+    {
+        "menu": trans("Bank Management"),
+        "redirect": "#",
+        "accessibility": "payroll.sidebar.bank_management_accessibility",
+        "submenus": [
+            {
+                "menu": trans("Banks"),
+                "redirect": "/payroll/banks/",
+                "accessibility": "payroll.sidebar.bank_accessibility",
+            },
+            {
+                "menu": trans("Branches"),
+                "redirect": "/payroll/branches/",
+                "accessibility": "payroll.sidebar.branch_accessibility",
+            },
+        ],
+    },
 ]
 
 
@@ -80,3 +97,15 @@ def loan_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def federal_tax_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("payroll.view_filingstatus")
+
+
+def bank_management_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.view_bank") or request.user.has_perm("employee.view_bankbranch")
+
+
+def bank_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.view_bank")
+
+
+def branch_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.view_bankbranch")

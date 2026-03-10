@@ -58,7 +58,7 @@ class AllowanceForm(ModelForm):
 
         model = payroll.models.models.Allowance
         fields = "__all__"
-        exclude = ["is_active"]
+        exclude = ["is_active", "is_condition_based"]
         widgets = {
             "one_time_date": forms.DateTimeInput(attrs={"type": "date"}),
         }
@@ -247,7 +247,7 @@ class DeductionForm(ModelForm):
 
         model = payroll.models.models.Deduction
         fields = "__all__"
-        exclude = ["is_active"]
+        exclude = ["is_active", "is_condition_based"]
         widgets = {
             "one_time_date": forms.DateTimeInput(attrs={"type": "date"}),
         }

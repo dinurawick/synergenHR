@@ -1,39 +1,84 @@
 {% load i18n %} {% load basefilters %}{% load widget_tweaks %}
 {{ form.non_field_errors }}
 
+<style>
+    /* Hide the original select elements - select2 creates its own styled version */
+    #id_bank.select2-hidden-accessible,
+    #id_bank_branch.select2-hidden-accessible {
+        display: none !important;
+    }
+    
+    /* Ensure only one select2 container is visible */
+    .oh-input__group .select2-container ~ select {
+        display: none !important;
+    }
+</style>
+
 <div class="row">
     {% for field in form %}
-        {% if field.label != "Employee profile" and field.label != 'Country' and field.label != 'State' and field.label != 'Address' and field.label != 'Badge id' %}
+        {% if field.name == "bank" %}
             <div class="col-lg-6">
                 <div class="oh-input__group">
-                    <label class="oh-label {% if field.field.required %}required-star{% endif %}" for="id_{{ field.name }}"
-                        title="{{ field.help_text|safe }}">
-                        {% trans field.label %}
-                    </label>
-
-                    {% if field.field.widget.input_type == 'checkbox' %}
-                        <div class="oh-switch" style="width: 30px;">{{ field|add_class:'oh-switch__checkbox' }}</div>
-                    {% else %}
-                        {{ field|add_class:'form-control' }}
-                    {% endif %}
-
-                    {{ field.errors }}
-                </div>
-            </div>
-        {% elif field.label == 'Address' %}
-            <div class="col-lg-12">
-                <div class="oh-input__group">
-                    <label class="oh-label {% if field.field.required %}required-star{% endif %}" for="id_{{ field.name }}"
-                        title="{{ field.help_text|safe }}">
-                        {% trans field.label %}
+                    <label class="oh-label" for="id_{{ field.name }}">
+                        {% trans "Bank name" %}
                     </label>
                     {{ field }}
                     {{ field.errors }}
                 </div>
             </div>
-        {% elif field.label == 'Country' %}
-            <div class="row">
-                <div class="col-lg-6">
+        {% elif field.name == "bank_branch" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
+                    <label class="oh-label" for="id_{{ field.name }}">
+                        {% trans "Branch" %}
+                    </label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            </div>
+        {% elif field.name == "account_number" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
+                    <label class="oh-label {% if field.field.required %}required-star{% endif %}" for="id_{{ field.name }}">
+                        {% trans field.label %}
+                    </label>
+                    {{ field|add_class:'form-control' }}
+                    {{ field.errors }}
+                </div>
+            </div>
+        {% elif field.name == "any_other_code1" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
+                    <label class="oh-label" for="id_{{ field.name }}">
+                        {% trans "Bank Code #1" %}
+                    </label>
+                    {{ field|add_class:'form-control' }}
+                    {{ field.errors }}
+                </div>
+            </div>
+        {% elif field.name == "any_other_code2" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
+                    <label class="oh-label" for="id_{{ field.name }}">
+                        {% trans "Bank Code #2" %}
+                    </label>
+                    {{ field|add_class:'form-control' }}
+                    {{ field.errors }}
+                </div>
+            </div>
+        {% elif field.name == "address" %}
+            <div class="col-lg-12">
+                <div class="oh-input__group">
+                    <label class="oh-label" for="id_{{ field.name }}">
+                        {% trans "Address" %}
+                    </label>
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+            </div>
+        {% elif field.name == "country" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
                     <label class="oh-label" for="country">{% trans "Country" %}</label>
                     <select name="country" class="w-100 oh-select-2" id="country"
                         data-selected="{{ form.country.value|default:'' }}">
@@ -41,17 +86,154 @@
                     </select>
                     {{form.country.errors}}
                     <span class="dropdown-wrapper" aria-hidden="true"></span>
-                    </span>
                 </div>
-                <div class="col-lg-6">
+            </div>
+        {% elif field.name == "state" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
                     <label class="oh-label d-block" for="state">{% trans "State" %}</label>
                     <select name="state" class="w-100 oh-select-2" id="state" data-selected="{{ form.state.value|default:'' }}">
                         <option value="{{form.instance.state}}" selected>{{form.instance.state}}</option>
-
                     </select>
                     {{form.state.errors}}
+                </div>
+            </div>
+        {% elif field.name == "city" %}
+            <div class="col-lg-6">
+                <div class="oh-input__group">
+                    <label class="oh-label" for="id_{{ field.name }}">
+                        {% trans "City" %}
+                    </label>
+                    {{ field|add_class:'form-control' }}
+                    {{ field.errors }}
                 </div>
             </div>
         {% endif %}
     {% endfor %}
 </div>
+
+<script>
+$(document).ready(function() {
+    // Wait a bit for any global select2 initialization to complete
+    setTimeout(function() {
+        // Destroy any existing select2 instances first
+        if ($('#id_bank').data('select2')) {
+            $('#id_bank').select2('destroy');
+        }
+        if ($('#id_bank_branch').data('select2')) {
+            $('#id_bank_branch').select2('destroy');
+        }
+        
+        // Now initialize our own select2 instances
+        $('#id_bank').select2({
+            placeholder: '---Choose Bank---',
+            allowClear: true,
+            width: '100%'
+        });
+        
+        $('#id_bank_branch').select2({
+            placeholder: '---Choose Branch---',
+            allowClear: true,
+            width: '100%'
+        });
+    }, 100);
+    
+    // Cascading dropdown logic for Bank -> Branch
+    $('#id_bank').on('change', function() {
+        var bankId = $(this).val();
+        var branchSelect = $('#id_bank_branch');
+        
+        // Destroy select2 before modifying options
+        if (branchSelect.data('select2')) {
+            branchSelect.select2('destroy');
+        }
+        
+        // Clear branch dropdown
+        branchSelect.empty();
+        branchSelect.append('<option value="">---Choose Branch---</option>');
+        
+        // Clear bank codes
+        $('#id_any_other_code1').val('');
+        $('#id_any_other_code2').val('');
+        
+        if (bankId) {
+            // Fetch branches for selected bank
+            $.ajax({
+                url: '/employee/api/get-branches/',
+                data: { 'bank_id': bankId },
+                success: function(data) {
+                    if (data.branches && data.branches.length > 0) {
+                        $.each(data.branches, function(index, branch) {
+                            branchSelect.append(
+                                $('<option></option>').val(branch.id).text(branch.name)
+                            );
+                        });
+                    }
+                    
+                    // Reinitialize select2 after adding options
+                    branchSelect.select2({
+                        placeholder: '---Choose Branch---',
+                        allowClear: true,
+                        width: '100%'
+                    });
+                },
+                error: function(xhr, status, error) {
+                    // Still reinitialize select2 even on error
+                    branchSelect.select2({
+                        placeholder: '---Choose Branch---',
+                        allowClear: true,
+                        width: '100%'
+                    });
+                }
+            });
+        } else {
+            // Reinitialize select2 when bank is cleared
+            branchSelect.select2({
+                placeholder: '---Choose Branch---',
+                allowClear: true,
+                width: '100%'
+            });
+        }
+    });
+    
+    // Auto-fill bank codes when branch is selected
+    $('#id_bank_branch').on('change', function() {
+        var branchId = $(this).val();
+        
+        if (branchId) {
+            // Find the selected branch data
+            $.ajax({
+                url: '/employee/api/get-branches/',
+                data: { 'bank_id': $('#id_bank').val() },
+                success: function(data) {
+                    var selectedBranch = data.branches.find(b => b.id == branchId);
+                    if (selectedBranch) {
+                        $('#id_any_other_code1').val(selectedBranch.bank_code_1);
+                        $('#id_any_other_code2').val(selectedBranch.bank_code_2 || '');
+                    }
+                }
+            });
+        } else {
+            $('#id_any_other_code1').val('');
+            $('#id_any_other_code2').val('');
+        }
+    });
+    
+    // Trigger change on page load if bank is already selected
+    setTimeout(function() {
+        var initialBankId = $('#id_bank').val();
+        
+        if (initialBankId) {
+            $('#id_bank').trigger('change');
+            
+            // Set the selected branch after branches are loaded
+            setTimeout(function() {
+                var selectedBranchId = '{{ form.instance.bank_branch.id|default:"" }}';
+                if (selectedBranchId) {
+                    $('#id_bank_branch').val(selectedBranchId).trigger('change');
+                }
+            }, 500);
+        }
+    }, 200);
+});
+</script>

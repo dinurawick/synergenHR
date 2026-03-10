@@ -426,4 +426,7 @@ urlpatterns = [
         name="employee-tag-delete",
         kwargs={"model": EmployeeTag, "HttpResponse": True},
     ),
+    # Bank registry API endpoints
+    path("api/get-banks/", views.get_banks_api, name="get-banks-api"),
+    path("api/get-branches/", views.get_branches_api, name="get-branches-api"),
 ]

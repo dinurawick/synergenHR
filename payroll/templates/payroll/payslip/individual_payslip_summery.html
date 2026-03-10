@@ -36,6 +36,32 @@
         </ul>
     </div>
 
+    {% if employee.employee_bank_details.bank %}
+    <div class="oh-payslip__user-detail">
+        <h3 class="oh-payslip__employee-title">
+            {% trans "Bank Details" %}
+        </h3>
+        <ul class="oh-payslip__employee-details">
+            <li class="oh-payslip__employee-detail">
+                <span class="oh-payslip__employee-detail-title">{% trans "Bank Name" %}</span>
+                <span class="oh-payslip__employee-detail-value">{{employee.employee_bank_details.bank.name}}</span>
+            </li>
+            <li class="oh-payslip__employee-detail">
+                <span class="oh-payslip__employee-detail-title">{% trans "Branch" %}</span>
+                <span class="oh-payslip__employee-detail-value">{% if employee.employee_bank_details.bank_branch %}{{employee.employee_bank_details.bank_branch.name}}{% else %}-{% endif %}</span>
+            </li>
+            <li class="oh-payslip__employee-detail">
+                <span class="oh-payslip__employee-detail-title">{% trans "Bank Code #1" %}</span>
+                <span class="oh-payslip__employee-detail-value">{% if employee.employee_bank_details.any_other_code1 %}{{employee.employee_bank_details.any_other_code1}}{% else %}-{% endif %}</span>
+            </li>
+            <li class="oh-payslip__employee-detail">
+                <span class="oh-payslip__employee-detail-title">{% trans "Bank Code #2" %}</span>
+                <span class="oh-payslip__employee-detail-value">{% if employee.employee_bank_details.any_other_code2 %}{{employee.employee_bank_details.any_other_code2}}{% else %}-{% endif %}</span>
+            </li>
+        </ul>
+    </div>
+    {% endif %}
+
     <div class="oh-payslip__netpay" style="text-align:left; border-radius: 15px; border: 1px solid hsl(213,22%,84%);">
         <div style="border-radius: 15px; background-color: #d2f8d7; padding: 10px; border-left: 3px solid #00cc66;">
             <span class="oh-payslip__netpay-amount">{{ net_pay|floatformat:2|currency_symbol_position }}</span>
