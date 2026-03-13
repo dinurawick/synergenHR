@@ -54,7 +54,7 @@ class LeaveTypeFilter(FilterSet):
 
         model = LeaveType
         fields = "__all__"
-        exclude = ["icon"]
+        exclude = ["icon", "conditional_formatting_rule"]
 
 
 class AssignedLeaveFilter(FilterSet):

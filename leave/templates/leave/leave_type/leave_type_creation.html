@@ -2,6 +2,53 @@
 {% load static %}
 {% load i18n %}
 {% block content %}
+
+<style>
+/* Fix the neon yellow gender restriction dropdown */
+#id_gender_restriction {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ddd !important;
+    height: auto !important;
+    size: 1 !important;
+}
+
+#id_gender_restriction option {
+    background-color: white !important;
+    color: black !important;
+}
+
+/* Hide multiple options display */
+#id_gender_restriction[size] {
+    size: 1 !important;
+}
+
+/* Select2 styling override */
+.select2-container--default .select2-selection--single {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ddd !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: black !important;
+}
+
+.select2-dropdown {
+    background-color: white !important;
+}
+
+.select2-results__option {
+    background-color: white !important;
+    color: black !important;
+}
+
+.select2-results__option--highlighted {
+    background-color: #f8f9fa !important;
+    color: black !important;
+}
+</style>
+
 {% if form.errors %}
     <div class="oh-wrapper">
         <div class="oh-alert-container">
@@ -258,6 +305,32 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Conditional Formatting Fields -->
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info  justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <label for="" class="oh-label">{{ form.use_conditional_formatting.label }}</label>
+                                <span class=" oh-info me-3"
+                                    title="{% trans 'Apply Python-based rules for leave allocation (e.g., based on employee type)' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3 ">
+                                {{form.use_conditional_formatting}}
+                                {{form.use_conditional_formatting.errors}}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-sm-12 col-md-12 col-lg-6" id="conditional_formatting_rule_container" style="display:none;">
+                        <div class="oh-input-group oh-label__info">
+                            <label for="id_conditional_formatting_rule" class="oh-label">{{ form.conditional_formatting_rule.label }}</label>
+                            <span class=" oh-info me-3"
+                                title="{% trans 'Select a conditional formatting rule to apply' %}"></span>
+                        </div>
+                        {{form.conditional_formatting_rule}}
+                        {{form.conditional_formatting_rule.errors}}
+                    </div>
+                    
                     {% if perms.leave.add_availableleave %}
                         <div class="col-sm-12 col-md-12">
                             <div class="oh-input-group oh-label__info">
@@ -265,6 +338,28 @@
                                 <span class=" oh-info me-3"
                                     title="{% trans 'Choose employees to assign this leave type' %}"></span>
                             </div>
+                            
+                            <!-- First row: Gender filter and Apply Filter button -->
+                            <div class="mb-3 d-flex align-items-center gap-3">
+                                <div class="d-flex align-items-center">
+                                    {{form.gender_restriction}}
+                                </div>
+                                <button type="button" id="test-filter-btn" class="oh-btn oh-btn--warning oh-btn--sm">
+                                    <i class="fa fa-filter"></i> {% trans "Apply Filter" %}
+                                </button>
+                            </div>
+                            
+                            <!-- Second row: Select All and Deselect All buttons -->
+                            <div class="mb-2 d-flex gap-3">
+                                <button type="button" id="select-all-employees-btn" class="oh-btn oh-btn--light oh-btn--sm">
+                                    <i class="fa fa-check-square"></i> {% trans "Select All" %}
+                                </button>
+                                <button type="button" id="deselect-all-employees-btn" class="oh-btn oh-btn--light oh-btn--sm">
+                                    <i class="fa fa-square-o"></i> {% trans "Deselect All" %}
+                                </button>
+                            </div>
+                            
+                            {{form.gender_restriction.errors}}
                             {{form.employee_id}}
                             {{form.employee_id.errors}}
                         </div>
@@ -289,6 +384,14 @@
 
 <script>
     $(document).ready(function () {
+        // Fix gender restriction dropdown styling and behavior
+        $('#id_gender_restriction').css({
+            'background-color': 'white',
+            'color': 'black',
+            'border': '1px solid #ddd',
+            'height': 'auto'
+        }).removeAttr('size').attr('size', '1');
+        
         var reset = $("#id_reset");
         var reset_based_label = $("label[for='id_reset_based']");
         var reset_based_span = $("#reset_based_id");
@@ -531,23 +634,261 @@
         // Initialize all yes/no fields on page load
         checkYesOrNoFields();
         
-        // Select All Employees Functionality
-        $("#select-all-employees").change(function () {
-            var isChecked = $(this).prop("checked");
-
-            if ($("#id_employee_id").is("select")) {
-                $("#id_employee_id option").prop("selected", isChecked);
-            } else if ($('#id_employee_id input[type="checkbox"]').length > 0) {
-                $('#id_employee_id input[type="checkbox"]').each(function () {
-                    $(this).prop("checked", false);
-
-                    if (isChecked) {
-                        $(this).prop("checked", true);
-                    }
+        // Toggle conditional formatting dropdown and disable Total Days field
+        function toggleConditionalFormattingDropdown(checkbox) {
+            var $totalDaysContainer = $('.totalDaysContainer');
+            var $countField = $('#id_count');
+            
+            if (checkbox.is(':checked')) {
+                // Show conditional formatting dropdown
+                $('#conditional_formatting_rule_container').show();
+                
+                // Disable and grey out Total Days field
+                $countField.prop('disabled', true);
+                $countField.prop('required', false); // Remove required attribute
+                $countField.css({
+                    'background-color': '#f0f0f0',
+                    'cursor': 'not-allowed',
+                    'opacity': '0.6'
                 });
+                $countField.val('0'); // Set to 0 as it will be calculated
+                
+                // Add info message
+                var $conditionalNote = $('#conditional-formatting-note');
+                if ($conditionalNote.length === 0) {
+                    $conditionalNote = $('<div id="conditional-formatting-note" class="oh-alert oh-alert--warning mt-2" style="font-size: 12px;"></div>');
+                    $totalDaysContainer.append($conditionalNote);
+                }
+                $conditionalNote.html('<i class="fa fa-info-circle"></i> Total days will be calculated automatically based on the conditional formatting rule.').show();
+                
+            } else {
+                // Hide conditional formatting dropdown
+                $('#conditional_formatting_rule_container').hide();
+                $('#id_conditional_formatting_rule').val('');
+                
+                // Re-enable Total Days field
+                $countField.prop('disabled', false);
+                $countField.prop('required', true); // Restore required attribute
+                $countField.css({
+                    'background-color': '',
+                    'cursor': '',
+                    'opacity': ''
+                });
+                
+                // Remove info message
+                $('#conditional-formatting-note').hide();
             }
-
-            $("#id_employee_id").trigger("change");
+        }
+        
+        // Initialize conditional formatting visibility
+        toggleConditionalFormattingDropdown($('#id_use_conditional_formatting'));
+        
+        // Handle conditional formatting toggle change
+        $('#id_use_conditional_formatting').change(function() {
+            toggleConditionalFormattingDropdown($(this));
+        });
+        
+        // Gender-based employee filtering - WORKS WITH SELECT2
+        // Define the filter function
+        function filterEmployeesByGender() {
+            console.log('=== GENDER FILTER DEBUG START ===');
+            var selectedGender = $('#id_gender_restriction').val();
+            console.log('Selected gender:', selectedGender);
+            
+            var $employeeSelect = $('#id_employee_id');
+            console.log('Employee select found:', $employeeSelect.length > 0);
+            
+            // Show loading message
+            $employeeSelect.prop('disabled', true);
+            $employeeSelect.html('<option>Loading employees...</option>');
+            
+            console.log('Making AJAX call to: /leave/filter-employees-by-gender');
+            console.log('With data:', { gender: selectedGender });
+            
+            // Make AJAX call to get filtered employees
+            $.ajax({
+                url: '/leave/filter-employees-by-gender',
+                method: 'GET',
+                data: { gender: selectedGender },
+                success: function(response) {
+                    console.log('AJAX SUCCESS - Response:', response);
+                    console.log('Number of employees returned:', response.employees ? response.employees.length : 0);
+                    // Clear current options
+                    $employeeSelect.empty();
+                    console.log('Cleared existing options');
+                    
+                    // Add filtered employees
+                    if (response.employees && response.employees.length > 0) {
+                        console.log('Adding', response.employees.length, 'employees to dropdown');
+                        $.each(response.employees, function(index, emp) {
+                            $employeeSelect.append(
+                                $('<option></option>')
+                                    .attr('value', emp.id)
+                                    .text(emp.name)
+                            );
+                        });
+                        console.log('Options added successfully');
+                        
+                        // Show success message
+                        var message = selectedGender === 'all' || !selectedGender
+                            ? 'Showing all active employees (' + response.employees.length + ')'
+                            : 'Showing only ' + selectedGender + ' employees (' + response.employees.length + ')';
+                        
+                        showGenderFilterMessage(message, 'info');
+                    } else {
+                        console.log('No employees found for gender:', selectedGender);
+                        $employeeSelect.append('<option>No employees found</option>');
+                        showGenderFilterMessage('No employees found for selected gender', 'warning');
+                    }
+                    
+                    // Re-enable select
+                    $employeeSelect.prop('disabled', false);
+                    console.log('Employee select re-enabled');
+                    
+                    // Just trigger change event to update Select2 display
+                    if ($.fn.select2 && $employeeSelect.hasClass('oh-select-2')) {
+                        console.log('Triggering Select2 change event');
+                        $employeeSelect.trigger('change');
+                    }
+                    
+                    console.log('=== FINAL CHECK: Options in select ===');
+                    console.log('Number of options:', $employeeSelect.find('option').length);
+                    $employeeSelect.find('option').each(function(i) {
+                        if (i < 5) { // Only log first 5 to avoid spam
+                            console.log('  Option', i, ':', $(this).val(), '-', $(this).text());
+                        }
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error('=== AJAX ERROR ===');
+                    console.error('Status:', status);
+                    console.error('Error:', error);
+                    console.error('Response:', xhr.responseText);
+                    console.error('Status code:', xhr.status);
+                    
+                    $employeeSelect.prop('disabled', false);
+                    $employeeSelect.html('<option>Error loading employees</option>');
+                    showGenderFilterMessage('Error loading employees. Check console for details.', 'danger');
+                }
+            });
+            console.log('=== GENDER FILTER DEBUG END ===');
+        }
+        
+        // Helper function to show messages
+        function showGenderFilterMessage(message, type) {
+            var $employeeWidget = $('#id_employee_id').closest('.oh-input-group');
+            var $genderNote = $('#gender-filter-note');
+            
+            if ($genderNote.length === 0) {
+                $genderNote = $('<div id="gender-filter-note" class="oh-alert mt-2" style="font-size: 12px;"></div>');
+                $employeeWidget.append($genderNote);
+            }
+            
+            $genderNote.removeClass('oh-alert--info oh-alert--warning oh-alert--danger');
+            $genderNote.addClass('oh-alert--' + type);
+            $genderNote.html('<i class="fa fa-info-circle"></i> ' + message).show();
+        }
+        
+        // Initialize on page load - load all employees
+        console.log('=== INITIALIZING GENDER FILTER ===');
+        console.log('Gender restriction field exists:', $('#id_gender_restriction').length);
+        console.log('Initial value:', $('#id_gender_restriction').val());
+        
+        // Function to bind events once Select2 is ready
+        function bindGenderEvents() {
+            var $genderSelect = $('#id_gender_restriction');
+            
+            if ($genderSelect.hasClass('select2-hidden-accessible')) {
+                console.log('=== SELECT2 IS READY, BINDING EVENTS ===');
+                
+                // Unbind any existing events first
+                $genderSelect.off('select2:select select2:unselect change');
+                
+                // Bind to Select2 change event
+                $genderSelect.on('select2:select select2:unselect change', function(e) {
+                    console.log('=== SELECT2 CHANGE EVENT FIRED ===');
+                    console.log('Event type:', e.type);
+                    console.log('Selected value:', $(this).val());
+                    
+                    // Call the filter function directly
+                    filterEmployeesByGender();
+                });
+                
+                console.log('=== EVENTS BOUND TO SELECT2 ===');
+                
+                // Load initial employees
+                filterEmployeesByGender();
+                return true;
+            }
+            return false;
+        }
+        
+        // Try to bind events multiple times until Select2 is ready
+        var attempts = 0;
+        var maxAttempts = 10;
+        var bindInterval = setInterval(function() {
+            attempts++;
+            console.log('=== ATTEMPT', attempts, 'TO BIND EVENTS ===');
+            
+            if (bindGenderEvents() || attempts >= maxAttempts) {
+                clearInterval(bindInterval);
+                if (attempts >= maxAttempts) {
+                    console.log('=== MAX ATTEMPTS REACHED, USING FALLBACK ===');
+                    // Fallback: use document delegation
+                    $(document).on('change', '#id_gender_restriction', function(e) {
+                        console.log('=== FALLBACK CHANGE EVENT ===');
+                        filterEmployeesByGender();
+                    });
+                }
+            }
+        }, 500);
+        
+        // Test Filter Button
+        $("#test-filter-btn").click(function () {
+            console.log('=== MANUAL TEST FILTER CLICKED ===');
+            filterEmployeesByGender();
+        });
+        
+        // Select All Employees Button
+        $("#select-all-employees-btn").click(function () {
+            var $employeeSelect = $("#id_employee_id");
+            
+            if ($employeeSelect.is("select")) {
+                // For select dropdown, select all options
+                $employeeSelect.find('option').prop("selected", true);
+                
+                // If using Select2, trigger change
+                if ($.fn.select2 && $employeeSelect.hasClass('oh-select-2')) {
+                    $employeeSelect.trigger('change');
+                }
+            } else if ($employeeSelect.find('input[type="checkbox"]').length > 0) {
+                // For checkbox list, check all
+                $employeeSelect.find('input[type="checkbox"]').prop("checked", true);
+            }
+            
+            $employeeSelect.trigger("change");
+            console.log('Selected all employees');
+        });
+        
+        // Deselect All Employees Button
+        $("#deselect-all-employees-btn").click(function () {
+            var $employeeSelect = $("#id_employee_id");
+            
+            if ($employeeSelect.is("select")) {
+                // For select dropdown, deselect all options
+                $employeeSelect.find('option').prop("selected", false);
+                
+                // If using Select2, trigger change
+                if ($.fn.select2 && $employeeSelect.hasClass('oh-select-2')) {
+                    $employeeSelect.trigger('change');
+                }
+            } else if ($employeeSelect.find('input[type="checkbox"]').length > 0) {
+                // For checkbox list, uncheck all
+                $employeeSelect.find('input[type="checkbox"]').prop("checked", false);
+            }
+            
+            $employeeSelect.trigger("change");
+            console.log('Deselected all employees');
         });
     });
 

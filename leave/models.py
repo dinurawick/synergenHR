@@ -242,6 +242,38 @@ class LeaveType(HorillaModel):
         max_length=30, choices=CHOICES, default="no", verbose_name=_("Exclude Weekends")
     )
     is_compensatory_leave = models.BooleanField(default=False)
+    
+    # Conditional formatting for dynamic leave allocation
+    use_conditional_formatting = models.BooleanField(
+        default=False,
+        verbose_name=_("Use Conditional Formatting"),
+        help_text=_("Apply Python-based rules for leave allocation (e.g., based on employee type)")
+    )
+    conditional_formatting_rule = models.ForeignKey(
+        'payroll.ConditionalFormatting',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='leave_types',
+        verbose_name=_("Conditional Formatting Rule"),
+        help_text=_("Select a conditional formatting rule to apply")
+    )
+    
+    # Gender-based restrictions
+    GENDER_RESTRICTION_CHOICES = [
+        ('all', _('All Genders')),
+        ('male', _('Male Only')),
+        ('female', _('Female Only')),
+        ('other', _('Other Only')),
+    ]
+    gender_restriction = models.CharField(
+        max_length=10,
+        choices=GENDER_RESTRICTION_CHOICES,
+        default='all',
+        verbose_name=_("Gender Restriction"),
+        help_text=_("Restrict this leave type to specific gender (e.g., maternity leave for females only)")
+    )
+    
     company_id = models.ForeignKey(
         Company, null=True, blank=True, on_delete=models.PROTECT
     )

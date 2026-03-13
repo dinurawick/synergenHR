@@ -12,6 +12,11 @@ urlpatterns = [
     path("type-creation", views.leave_type_creation, name="type-creation"),
     path("type-view/", views.leave_type_view, name="type-view"),
     path(
+        "filter-employees-by-gender",
+        views.filter_employees_by_gender,
+        name="filter-employees-by-gender",
+    ),
+    path(
         "leave-type-individual-view/<int:id>",
         views.leave_type_individual_view,
         name="leave-type-individual-view",

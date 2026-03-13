@@ -131,6 +131,40 @@ def leave_type_creation(request):
     return render(request, "leave/leave_type/leave_type_creation.html", {"form": form})
 
 
+@login_required
+@require_http_methods(["GET"])
+def filter_employees_by_gender(request):
+    """
+    AJAX endpoint to filter employees by gender for leave type assignment.
+    
+    Parameters:
+    request (HttpRequest): The HTTP request object with 'gender' query parameter.
+    
+    Returns:
+    JsonResponse: List of employees matching the gender filter
+    """
+    gender = request.GET.get('gender', '')
+    
+    # Base queryset - only active employees
+    base_queryset = Employee.objects.filter(is_active=True)
+    
+    if gender and gender in ['male', 'female', 'other']:
+        employees = base_queryset.filter(gender=gender).values('id', 'employee_first_name', 'employee_last_name', 'badge_id')
+    else:
+        employees = base_queryset.values('id', 'employee_first_name', 'employee_last_name', 'badge_id')
+    
+    # Format employee data for response
+    employee_list = [
+        {
+            'id': emp['id'],
+            'name': f"{emp['employee_first_name']} {emp['employee_last_name']} ({emp['badge_id']})"
+        }
+        for emp in employees
+    ]
+    
+    return JsonResponse({'employees': employee_list})
+
+
 def paginator_qry(qryset, page_number):
     """
     function used to paginate query set

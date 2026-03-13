@@ -2981,7 +2981,15 @@ def widget_filter(request):
     """
     This method is used to return all the ids of the employees
     """
-    ids = EmployeeFilter(request.GET).qs.values_list("id", flat=True)
+    queryset = Employee.objects.all()
+    
+    # Check for gender filter parameter (from leave type gender restriction)
+    gender_filter = request.GET.get('gender')
+    if gender_filter and gender_filter in ['male', 'female', 'other']:
+        queryset = queryset.filter(gender=gender_filter)
+    
+    # Apply the employee filter
+    ids = EmployeeFilter(request.GET, queryset=queryset).qs.values_list("id", flat=True)
     return JsonResponse({"ids": list(ids)})
 
 

@@ -97,6 +97,7 @@ class LeaveTypeAdminForm(forms.ModelForm):
     class Meta:
         model = LeaveType
         fields = "__all__"
+        exclude = ["conditional_formatting_rule", "use_conditional_formatting", "gender_restriction"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -111,16 +112,15 @@ class LeaveTypeAdminForm(forms.ModelForm):
 
 class LeaveTypeForm(ConditionForm):
 
-    employee_id = HorillaMultiSelectField(
-        queryset=Employee.objects.all(),
-        widget=HorillaMultiSelectWidget(
-            filter_route_name="employee-widget-filter",
-            filter_class=EmployeeFilter,
-            filter_instance_contex_name="f",
-            filter_template_path="employee_filters.html",
-            required=False,
-        ),
+    employee_id = forms.ModelMultipleChoiceField(
+        queryset=Employee.objects.filter(is_active=True),
+        widget=forms.SelectMultiple(attrs={
+            'class': 'oh-select oh-select-2 w-100',
+            'size': '10',
+            'style': 'min-height: 200px;'
+        }),
         label=_("Employee"),
+        required=False,
     )
 
     class Meta:
@@ -139,6 +139,11 @@ class LeaveTypeForm(ConditionForm):
             "exclude_company_leave": forms.Select(attrs={"id": "id_exclude_company_leave"}),
             "exclude_holiday": forms.Select(attrs={"id": "id_exclude_holiday"}),
             "exclude_weekends": forms.Select(attrs={"id": "id_exclude_weekends"}),
+            "gender_restriction": forms.Select(attrs={
+                "id": "id_gender_restriction", 
+                "class": "oh-select oh-select-2 w-100",
+                "style": "background-color: white !important; color: black !important;"
+            }),
         }
 
     def clean(self):
@@ -147,7 +152,17 @@ class LeaveTypeForm(ConditionForm):
             del self.errors["employee_id"]
         if "exceed_days" in self.errors:
             del self.errors["exceed_days"]
-        if not cleaned_data["limit_leave"]:
+        
+        # If conditional formatting is enabled, Total Days is not required
+        use_conditional_formatting = cleaned_data.get("use_conditional_formatting", False)
+        if use_conditional_formatting:
+            # Remove count field errors since it's not required with conditional formatting
+            if "count" in self.errors:
+                del self.errors["count"]
+            # Set a default value for total_days (will be overridden by conditional formatting)
+            cleaned_data["total_days"] = 0
+        
+        if not cleaned_data.get("limit_leave"):
             cleaned_data["total_days"] = LEAVE_MAX_LIMIT
             cleaned_data["reset"] = True
             cleaned_data["reset_based"] = "yearly"
@@ -157,7 +172,10 @@ class LeaveTypeForm(ConditionForm):
         return cleaned_data
 
     def save(self, *args, **kwargs):
+        # Save the leave type first
         leave_type = super().save(*args, **kwargs)
+        
+        # Handle employee assignments
         if employees := self.data.getlist("employee_id"):
             for employee_id in employees:
                 employee = Employee.objects.get(id=employee_id)
@@ -166,9 +184,60 @@ class LeaveTypeForm(ConditionForm):
                     employee_id=employee,
                     available_days=leave_type.total_days,
                 ).save()
+        
+        return leave_type
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Add conditional formatting dropdown dynamically
+        try:
+            from payroll.models.models import ConditionalFormatting
+            from django.forms import ModelChoiceField
+            
+            self.fields["conditional_formatting_rule"] = ModelChoiceField(
+                queryset=ConditionalFormatting.objects.filter(
+                    module_type="leave",
+                    is_active=True,
+                ),
+                required=False,
+                label=_("Conditional Formatting Rule"),
+                help_text=_("Select a conditional formatting rule to apply"),
+                widget=forms.Select(attrs={
+                    "id": "id_conditional_formatting_rule",
+                    "class": "oh-select oh-select-2 w-100"
+                })
+            )
+        except ImportError:
+            pass
+        
+        # Add widget attributes for conditional formatting toggle
+        if "use_conditional_formatting" in self.fields:
+            self.fields["use_conditional_formatting"].widget.attrs.update({
+                "id": "id_use_conditional_formatting",
+                "onchange": "toggleConditionalFormattingDropdown($(this))",
+                "class": "oh-switch__checkbox"
+            })
+        
+        # Filter employees based on gender restriction from POST data or instance
+        gender_restriction = None
+        if self.data.get("gender_restriction"):
+            gender_restriction = self.data.get("gender_restriction")
+        elif self.instance and self.instance.pk and self.instance.gender_restriction:
+            gender_restriction = self.instance.gender_restriction
+        
+        # Apply gender-based filtering to employee queryset
+        if gender_restriction and gender_restriction in ['male', 'female', 'other']:
+            # Filter employees by gender - this sets the initial queryset
+            filtered_employees = Employee.objects.filter(gender=gender_restriction, is_active=True)
+            self.fields["employee_id"].queryset = filtered_employees
+            # Store gender restriction in widget for filter to use
+            self.fields["employee_id"].widget.attrs['data-gender'] = gender_restriction
+        else:
+            # No gender restriction - show all active employees
+            self.fields["employee_id"].queryset = Employee.objects.filter(is_active=True)
+
+
 
 
 class UpdateLeaveTypeForm(ConditionForm):
@@ -193,11 +262,76 @@ class UpdateLeaveTypeForm(ConditionForm):
 
         if expire_date := self.instance.carryforward_expire_date:
             self.fields["carryforward_expire_date"] = expire_date
+        
+        # Add conditional formatting dropdown dynamically to avoid app loading order issues
+        try:
+            from payroll.models.models import ConditionalFormatting
+            from django.forms import ModelChoiceField
+            
+            # Get initial value from instance if it exists
+            initial_value = None
+            if self.instance and hasattr(self.instance, 'conditional_formatting_rule') and self.instance.conditional_formatting_rule:
+                initial_value = self.instance.conditional_formatting_rule
+            
+            self.fields["conditional_formatting_rule"] = ModelChoiceField(
+                queryset=ConditionalFormatting.objects.filter(
+                    module_type="leave",
+                    is_active=True,
+                ),
+                required=False,
+                initial=initial_value,
+                label=_("Conditional Formatting Rule"),
+                help_text=_("Select a conditional formatting rule to apply"),
+                widget=forms.Select(attrs={
+                    "id": "id_conditional_formatting_rule",
+                    "class": "oh-select oh-select-2 w-100"
+                })
+            )
+        except ImportError:
+            pass
+        
+        # Add widget attributes for conditional formatting toggle
+        if "use_conditional_formatting" in self.fields:
+            self.fields["use_conditional_formatting"].widget.attrs.update({
+                "id": "id_use_conditional_formatting",
+                "onchange": "toggleConditionalFormattingDropdown($(this))",
+                "class": "oh-switch__checkbox"
+            })
+        
+        # Add widget attributes for gender restriction with onchange event
+        if "gender_restriction" in self.fields:
+            self.fields["gender_restriction"].widget.attrs.update({
+                "id": "id_gender_restriction",
+                "class": "oh-select oh-select-2 w-100",
+                "onchange": "filterEmployeesByGender($(this))"
+            })
+        
+        # Filter employees based on gender restriction from POST data or instance
+        gender_restriction = None
+        if self.data.get("gender_restriction"):
+            gender_restriction = self.data.get("gender_restriction")
+        elif self.instance and self.instance.pk and self.instance.gender_restriction:
+            gender_restriction = self.instance.gender_restriction
+        
+        # Apply gender-based filtering to employee queryset (for update form)
+        if gender_restriction and gender_restriction in ['male', 'female', 'other']:
+            # Filter employees by gender
+            filtered_employees = Employee.objects.filter(gender=gender_restriction, is_active=True)
+            # Note: UpdateLeaveTypeForm doesn't have employee_id field, but we keep this for consistency
+            # The filtering will be applied in the assign leave functionality
+            pass
 
     class Meta:
         model = LeaveType
-        fields = "__all__"
-        exclude = ["is_active"]
+        fields = [
+            'icon', 'name', 'color', 'payment', 'count', 'period_in', 'limit_leave',
+            'total_days', 'reset', 'is_encashable', 'reset_based', 'reset_month',
+            'reset_day', 'reset_weekend', 'carryforward_type', 'carryforward_max',
+            'carryforward_expire_in', 'carryforward_expire_period', 'carryforward_expire_date',
+            'require_approval', 'require_attachment', 'exclude_company_leave',
+            'exclude_holiday', 'exclude_weekends', 'is_compensatory_leave',
+            'use_conditional_formatting', 'conditional_formatting_rule', 'gender_restriction', 'company_id'
+        ]
         widgets = {
             "color": TextInput(attrs={"type": "color", "style": "height:40px;"}),
             "period_in": forms.HiddenInput(),
@@ -223,7 +357,11 @@ class UpdateLeaveTypeForm(ConditionForm):
         return cleaned_data
 
     def save(self, *args, **kwargs):
+        # Save conditional_formatting_rule if it was provided
+        if 'conditional_formatting_rule' in self.cleaned_data:
+            self.instance.conditional_formatting_rule = self.cleaned_data['conditional_formatting_rule']
         leave_type = super().save(*args, **kwargs)
+        return leave_type
 
 
 class LeaveRequestCreationForm(BaseModelForm):
@@ -800,6 +938,23 @@ class AssignLeaveForm(HorillaForm):
             raise forms.ValidationError({"employee_id": "This field is required"})
         if not leave_type_id:
             raise forms.ValidationError({"leave_type_id": "This field is required"})
+        
+        # Validate gender restriction for selected leave type
+        if leave_type_id and employee_id:
+            gender_restriction = leave_type_id.gender_restriction
+            if gender_restriction and gender_restriction != 'all':
+                # Check if any selected employee doesn't match the gender restriction
+                invalid_employees = []
+                for employee in employee_id:
+                    if employee.gender != gender_restriction:
+                        invalid_employees.append(str(employee))
+                
+                if invalid_employees:
+                    raise forms.ValidationError({
+                        "employee_id": _(f"The selected leave type '{leave_type_id.name}' is restricted to {gender_restriction} employees only. "
+                                       f"The following employees do not match: {', '.join(invalid_employees)}")
+                    })
+        
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
@@ -809,6 +964,11 @@ class AssignLeaveForm(HorillaForm):
             {"required": True, "id": uuid.uuid4()}
         ),
         self.fields["leave_type_id"].label = "Leave Type"
+        
+        # Add onchange event to leave type to filter employees by gender restriction
+        self.fields["leave_type_id"].widget.attrs.update({
+            "onchange": "filterEmployeesByLeaveTypeGender($(this))"
+        })
 
 
 class LeaverequestcommentForm(BaseModelForm):
