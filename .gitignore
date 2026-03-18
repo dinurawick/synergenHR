@@ -230,3 +230,9 @@ deployment/.env.production
 *.md
 *.bat
 *.txt
+
+# GF deployment exceptions
+!deployment/deploy_gf.sh
+!deployment/gf.synergenhr.lk.conf
+!deployment/docker-compose.gf.yml
+CODE_OF_CONDUCT.md
