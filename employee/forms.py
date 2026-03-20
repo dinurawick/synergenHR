@@ -805,3 +805,66 @@ class EmployeeGeneralSettingPrefixForm(forms.ModelForm):
             "badge_id_prefix": forms.TextInput(attrs={"class": "oh-input w-100"}),
             "company_id": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
         }
+
+
+class BankForm(ModelForm):
+    """
+    Form for Bank model
+    """
+
+    class Meta:
+        model = Bank
+        fields = ["name", "country", "code"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "country": forms.Select(attrs={
+                "class": "w-100",
+                "id": "bank_country_select",  # Custom ID to avoid conflicts with global country.js that hijacks "country" ID
+                "style": "padding: 0.625rem 0.875rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;"
+            }),
+            "code": forms.TextInput(attrs={"class": "oh-input w-100"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs["placeholder"] = _("Enter bank name")
+        self.fields["code"].widget.attrs["placeholder"] = _("Enter bank code")
+        # Remove empty label since country is required
+        self.fields["country"].empty_label = None
+
+
+class BankBranchForm(ModelForm):
+    """
+    Form for BankBranch model
+    """
+
+    class Meta:
+        model = BankBranch
+        fields = [
+            "bank",
+            "name",
+            "branch_code",
+            "bank_code_1",
+            "bank_code_2",
+            "address",
+            "city",
+            "state",
+        ]
+        widgets = {
+            "bank": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "branch_code": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "bank_code_1": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "bank_code_2": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "address": forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+            "city": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "state": forms.TextInput(attrs={"class": "oh-input w-100"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs["placeholder"] = _("Enter branch name")
+        self.fields["branch_code"].widget.attrs["placeholder"] = _("Enter branch code")
+        self.fields["bank_code_1"].widget.attrs["placeholder"] = _("Enter primary bank code")
+        self.fields["bank_code_2"].widget.attrs["placeholder"] = _("Enter secondary bank code (optional)")
+        self.fields["bank_code_2"].required = False

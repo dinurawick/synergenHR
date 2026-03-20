@@ -134,6 +134,11 @@ class LeaveTypeForm(ConditionForm):
             "color": TextInput(attrs={"type": "color", "style": "height:40px;"}),
             "period_in": forms.HiddenInput(),
             "total_days": forms.HiddenInput(),
+            "require_approval": forms.Select(attrs={"id": "id_require_approval"}),
+            "require_attachment": forms.Select(attrs={"id": "id_require_attachment"}),
+            "exclude_company_leave": forms.Select(attrs={"id": "id_exclude_company_leave"}),
+            "exclude_holiday": forms.Select(attrs={"id": "id_exclude_holiday"}),
+            "exclude_weekends": forms.Select(attrs={"id": "id_exclude_weekends"}),
         }
 
     def clean(self):

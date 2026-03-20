@@ -1,0 +1,383 @@
+{% load i18n %}
+{% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{message.tags}}">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+        <span hx-get="{% url 'payroll-run-list' %}" hx-target="#PayrollRunList" hx-trigger="load"></span>
+    </div>
+{% endif %}
+<div class="oh-modal__dialog-header">
+    <span class="oh-modal__dialog-title">
+        <h5>{% if payroll_run %}{% trans "Update Payroll Run" %}{% else %}{% trans "Create Payroll Run" %}{% endif %}</h5>
+    </span>
+    <button type="button" class="oh-modal__close" data-dismiss="oh-modal" aria-label="Close"
+        data-toggle="oh-modal-toggle">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+<div class="oh-modal__dialog-body payroll-run-form">
+    <form hx-post="{% if payroll_run %}{% url 'update-payroll-run' payroll_run.id %}{% else %}{% url 'create-payroll-run' %}{% endif %}" hx-target="#objectCreateModalTarget">
+        {% csrf_token %} 
+        
+        <!-- Basic Information Section -->
+        <div class="form-section">
+            <h6 class="section-title">{% trans "Basic Information" %}</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="oh-input-group">
+                        <label for="{{ form.run_name.id_for_label }}">{{ form.run_name.label }}</label>
+                        {{ form.run_name }}
+                        {% if form.run_name.help_text %}
+                            <small class="helptext">{{ form.run_name.help_text }}</small>
+                        {% endif %}
+                        {% if form.run_name.errors %}
+                            <div class="error-text">{{ form.run_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="oh-input-group">
+                        <label for="{{ form.run_type.id_for_label }}">{{ form.run_type.label }}</label>
+                        {{ form.run_type }}
+                        {% if form.run_type.errors %}
+                            <div class="error-text">{{ form.run_type.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="oh-input-group">
+                        <label for="{{ form.frequency.id_for_label }}">{{ form.frequency.label }}</label>
+                        {{ form.frequency }}
+                        {% if form.frequency.errors %}
+                            <div class="error-text">{{ form.frequency.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Period & Payment Section -->
+        <div class="form-section">
+            <h6 class="section-title">{% trans "Period & Payment" %}</h6>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="oh-input-group">
+                        <label for="{{ form.period_start.id_for_label }}">{{ form.period_start.label }}</label>
+                        {{ form.period_start }}
+                        {% if form.period_start.errors %}
+                            <div class="error-text">{{ form.period_start.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="oh-input-group">
+                        <label for="{{ form.period_end.id_for_label }}">{{ form.period_end.label }}</label>
+                        {{ form.period_end }}
+                        {% if form.period_end.errors %}
+                            <div class="error-text">{{ form.period_end.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="oh-input-group">
+                        <label for="{{ form.payment_date.id_for_label }}">{{ form.payment_date.label }}</label>
+                        {{ form.payment_date }}
+                        {% if form.payment_date.errors %}
+                            <div class="error-text">{{ form.payment_date.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Employee Selection Section -->
+        <div class="form-section">
+            <h6 class="section-title">{% trans "Employee Selection" %}</h6>
+            <div class="employee-selection-container">
+                <div class="employee-selection-header">
+                    <label for="{{ form.selected_employees.id_for_label }}">{{ form.selected_employees.label }}</label>
+                    {% if form.selected_employees.help_text %}
+                        <small class="helptext">{{ form.selected_employees.help_text }}</small>
+                    {% endif %}
+                    <div class="selection-controls">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllEmployees">
+                            {% trans "Select All" %}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllEmployees">
+                            {% trans "Clear All" %}
+                        </button>
+                    </div>
+                </div>
+                <div class="employee-checkbox-container">
+                    {{ form.selected_employees }}
+                </div>
+                {% if form.selected_employees.errors %}
+                    <div class="error-text">{{ form.selected_employees.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Description & Notes Section -->
+        <div class="form-section">
+            <h6 class="section-title">{% trans "Additional Information" %}</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="oh-input-group">
+                        <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="error-text">{{ form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="oh-input-group">
+                        <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                            <div class="error-text">{{ form.notes.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="oh-modal__dialog-footer">
+            <button type="submit" class="oh-btn oh-btn--secondary oh-btn--shadow">
+                {% trans "Save" %}
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .payroll-run-form .oh-input-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .payroll-run-form label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-weight: 500;
+        font-size: 0.8125rem;
+        color: #374151;
+    }
+    
+    .payroll-run-form input[type="text"],
+    .payroll-run-form input[type="date"],
+    .payroll-run-form select,
+    .payroll-run-form textarea {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        transition: border-color 0.15s ease-in-out;
+    }
+    
+    .payroll-run-form input[type="text"]:focus,
+    .payroll-run-form input[type="date"]:focus,
+    .payroll-run-form select:focus,
+    .payroll-run-form textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .payroll-run-form textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+    
+    .payroll-run-form .oh-modal__dialog-footer {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .payroll-run-form .helptext {
+        display: block;
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+    
+    .payroll-run-form .error-text {
+        color: #dc2626;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+    
+    /* Form Sections */
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .form-section:last-of-type {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    /* Employee Selection Styles */
+    .employee-selection-container {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .employee-selection-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    
+    .employee-selection-header label {
+        margin-bottom: 0;
+        font-weight: 600;
+    }
+    
+    .selection-controls {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .selection-controls .btn {
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        border-radius: 0.25rem;
+    }
+    
+    .employee-checkbox-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        background: white;
+        padding: 0.75rem;
+    }
+    
+    .employee-checkbox-container ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 0.5rem;
+    }
+    
+    .employee-checkbox-container li {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        transition: background-color 0.15s ease-in-out;
+    }
+    
+    .employee-checkbox-container li:hover {
+        background-color: #f3f4f6;
+    }
+    
+    .employee-checkbox-container input[type="checkbox"] {
+        margin-right: 0.5rem;
+        width: auto;
+    }
+    
+    .employee-checkbox-container label {
+        margin-bottom: 0;
+        font-size: 0.875rem;
+        cursor: pointer;
+        flex: 1;
+    }
+    
+    /* Hide run_code field since it's auto-generated */
+    .payroll-run-form #id_run_code {
+        display: none;
+    }
+    
+    .payroll-run-form label[for="id_run_code"] {
+        display: none;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .employee-checkbox-container ul {
+            grid-template-columns: 1fr;
+        }
+        
+        .employee-selection-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .selection-controls {
+            margin-top: 0.5rem;
+            justify-content: flex-start;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Select All Employees functionality
+    const selectAllBtn = document.getElementById('selectAllEmployees');
+    const clearAllBtn = document.getElementById('clearAllEmployees');
+    const employeeCheckboxes = document.querySelectorAll('input[name="selected_employees"]');
+    
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            employeeCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        });
+    }
+    
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', function() {
+            employeeCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        });
+    }
+    
+    // Update button states based on selection
+    function updateButtonStates() {
+        const checkedCount = document.querySelectorAll('input[name="selected_employees"]:checked').length;
+        const totalCount = employeeCheckboxes.length;
+        
+        if (selectAllBtn) {
+            selectAllBtn.disabled = checkedCount === totalCount;
+        }
+        if (clearAllBtn) {
+            clearAllBtn.disabled = checkedCount === 0;
+        }
+    }
+    
+    // Listen for checkbox changes
+    employeeCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateButtonStates);
+    });
+    
+    // Initial button state update
+    updateButtonStates();
+});
+</script>

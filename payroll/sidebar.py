@@ -21,14 +21,26 @@ SUBMENUS = [
         "accessibility": "payroll.sidebar.dasbhoard_accessibility",
     },
     {
-        "menu": trans("Earnings"),
-        "redirect": reverse("view-allowance"),
-        "accessibility": "payroll.sidebar.allowance_accessibility",
+        "menu": trans("Payroll Runs"),
+        "redirect": reverse("payroll-run-list"),
+        "accessibility": "payroll.sidebar.payroll_run_accessibility",
     },
     {
-        "menu": trans("Deductions"),
-        "redirect": reverse("view-deduction"),
-        "accessibility": "payroll.sidebar.deduction_accessibility",
+        "menu": trans("Pay Items"),
+        "redirect": "#",
+        "accessibility": "payroll.sidebar.pay_items_accessibility",
+        "submenus": [
+            {
+                "menu": trans("Earnings"),
+                "redirect": reverse("view-allowance"),
+                "accessibility": "payroll.sidebar.allowance_accessibility",
+            },
+            {
+                "menu": trans("Deductions"),
+                "redirect": reverse("view-deduction"),
+                "accessibility": "payroll.sidebar.deduction_accessibility",
+            },
+        ],
     },
     {
         "menu": trans("Payslips"),
@@ -69,3 +81,19 @@ def loan_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def federal_tax_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("payroll.view_filingstatus")
+
+
+def bank_management_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.view_bank") or request.user.has_perm("employee.view_bankbranch")
+
+
+def bank_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.view_bank")
+
+
+def branch_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("employee.view_bankbranch")
+
+
+def payroll_run_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("payroll.view_payrollrun")

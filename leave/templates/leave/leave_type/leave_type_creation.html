@@ -509,6 +509,8 @@
     });
 
     $(document).ready(function () {
+        // Initialize all yes/no fields on page load
+        checkYesOrNoFields();
         // Select All Employees Functionality
         $("#select-all-employees").change(function () {
             var isChecked = $(this).prop("checked");

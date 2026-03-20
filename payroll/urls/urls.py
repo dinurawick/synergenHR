@@ -12,6 +12,9 @@ from payroll.views import views
 urlpatterns = [
     path("", include("payroll.urls.component_urls")),
     path("", include("payroll.urls.tax_urls")),
+    path("", include("payroll.urls.conditional_urls")),
+    path("", include("payroll.urls.bank_urls")),
+    path("", include("payroll.urls.payroll_run_urls")),
     path("get-language-code/", views.get_language_code, name="get-language-code"),
     path("contract-create", views.contract_create, name="contract-create"),
     path(

@@ -23,7 +23,6 @@ def refresh_outlook_auth_token():
         try:
             refresh_outlook_token(api)
             logger.info(f"Updated token for {api} outlook auth")
-            print(f"Updated token for {api} outlook auth")
         except Exception as e:
             logger.error(e)
 

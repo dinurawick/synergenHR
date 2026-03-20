@@ -765,6 +765,7 @@ def generate_payslip(request):
             employees = form.cleaned_data["employee_id"]
             start_date = form.cleaned_data["start_date"]
             end_date = form.cleaned_data["end_date"]
+            payroll_run = form.cleaned_data.get("payroll_run")  # Get payroll run
 
             group_name = form.cleaned_data["group_name"]
             for employee in employees:
@@ -792,6 +793,7 @@ def generate_payslip(request):
                 data["pay_data"] = json.loads(payslip["json_data"])
                 calculate_employer_contribution(data)
                 data["installments"] = payslip["installments"]
+                data["payroll_run"] = payroll_run  # Add payroll run
                 instance = save_payslip(**data)
                 instances.append(instance)
                 notify.send(
@@ -871,7 +873,24 @@ def create_payslip(request, new_post_data=None):
     if new_post_data:
         request.POST = new_post_data
 
-    form = forms.PayslipForm()
+    # Get payroll_run_id from URL parameters
+    payroll_run_id = request.GET.get('payroll_run_id')
+    
+    # Prepare initial data if payroll_run_id is provided
+    initial_data = {}
+    if payroll_run_id:
+        try:
+            from payroll.models.models import PayrollRun
+            payroll_run = PayrollRun.objects.get(id=payroll_run_id)
+            initial_data = {
+                'payroll_run': payroll_run_id,
+                'start_date': payroll_run.period_start,
+                'end_date': payroll_run.period_end,
+            }
+        except PayrollRun.DoesNotExist:
+            pass
+    
+    form = forms.PayslipForm(initial=initial_data, payroll_run_id=payroll_run_id)
 
     if request.method == "POST":
         employee_id = request.POST.get("employee_id")
@@ -890,7 +909,7 @@ def create_payslip(request, new_post_data=None):
                 new_post_data = request.POST.copy()
                 new_post_data["start_date"] = contract.contract_start_date
                 request.POST = new_post_data
-        form = forms.PayslipForm(request.POST)
+        form = forms.PayslipForm(request.POST, initial=initial_data, payroll_run_id=payroll_run_id)
         if form.is_valid():
             employee = form.cleaned_data["employee_id"]
             start_date = form.cleaned_data["start_date"]
@@ -903,6 +922,7 @@ def create_payslip(request, new_post_data=None):
                 employee = form.cleaned_data["employee_id"]
                 start_date = form.cleaned_data["start_date"]
                 end_date = form.cleaned_data["end_date"]
+                payroll_run = form.cleaned_data.get("payroll_run")  # Get payroll run from form
                 payslip_data = payroll_calculation(employee, start_date, end_date)
                 payslip_data["payslip"] = payslip
                 data = {}
@@ -922,8 +942,9 @@ def create_payslip(request, new_post_data=None):
                 data["pay_data"] = json.loads(payslip_data["json_data"])
                 calculate_employer_contribution(data)
                 data["installments"] = payslip_data["installments"]
+                data["payroll_run"] = payroll_run  # Add payroll run to data
                 payslip_data["instance"] = save_payslip(**data)
-                form = forms.PayslipForm()
+                form = forms.PayslipForm(initial=initial_data, payroll_run_id=payroll_run_id)
                 messages.success(request, _("Payslip Saved"))
                 payslip = payslip_data["instance"]
                 notify.send(
@@ -939,13 +960,29 @@ def create_payslip(request, new_post_data=None):
                     ),
                     icon="close",
                 )
-                return HttpResponse(
-                    f'<script>window.location.href = "/payroll/view-payslip/{payslip_data["instance"].id}/"</script>'
-                )
+                # If we came from a payroll run, close modal and refresh the parent view
+                if payroll_run_id:
+                    return HttpResponse(
+                        '<script>'
+                        'document.querySelector("#payslipCreateModal .oh-modal__close").click();'
+                        'window.location.reload();'
+                        '</script>'
+                    )
+                else:
+                    return HttpResponse(
+                        f'<script>window.location.href = "/payroll/view-payslip/{payslip_data["instance"].id}/"</script>'
+                    )
+    
+    # Pass payroll_run context to template
+    context = {
+        "individual_form": form,
+        "payroll_run_id": payroll_run_id
+    }
+    
     return render(
         request,
         "payroll/payslip/create_payslip.html",
-        {"individual_form": form},
+        context,
     )
 
 

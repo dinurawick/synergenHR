@@ -343,7 +343,8 @@ class DeductionForm(ModelForm):
                     condition.save()
                     multiple_conditions.append(condition)
         except Exception as e:
-            print(e)
+            # Handle exception silently
+            pass
         if commit:
             self.instance.other_conditions.add(*multiple_conditions)
         return multiple_conditions
@@ -355,7 +356,10 @@ class PayslipForm(ModelForm):
     """
 
     def __init__(self, *args, **kwargs):
+        # Extract payroll_run_id from kwargs if provided
+        payroll_run_id = kwargs.pop('payroll_run_id', None)
         super().__init__(*args, **kwargs)
+        
         active_contracts = Contract.objects.filter(contract_status="active")
         self.fields["employee_id"].choices = [
             (contract.employee_id.id, contract.employee_id)
@@ -370,7 +374,82 @@ class PayslipForm(ModelForm):
                 "hx-trigger": "change delay:300ms",
             }
         )
-        if self.instance.pk is None:
+        
+        # Filter payroll runs to show only active, non-cancelled runs
+        from payroll.models.models import PayrollRun
+        self.fields["payroll_run"].queryset = PayrollRun.objects.filter(
+            is_active=True
+        ).exclude(status__in=["cancelled", "paid"]).order_by("-created_at")
+        self.fields["payroll_run"].required = False
+        self.fields["payroll_run"].empty_label = _("Select Payroll Run (Optional)")
+        
+        # Pre-select payroll run if provided
+        if payroll_run_id:
+            try:
+                payroll_run = PayrollRun.objects.get(id=payroll_run_id)
+                
+                # Set initial values multiple ways to ensure it works
+                self.initial["payroll_run"] = payroll_run_id
+                self.fields["payroll_run"].initial = payroll_run_id
+                
+                # Also try setting the widget's initial value
+                if hasattr(self.fields["payroll_run"].widget, 'attrs'):
+                    self.fields["payroll_run"].widget.attrs['data-initial'] = payroll_run_id
+                
+                # Also pre-populate dates from payroll run
+                self.initial["start_date"] = payroll_run.period_start
+                self.initial["end_date"] = payroll_run.period_end
+                
+                # Get selected employees from payroll run (from notes or existing payslips)
+                selected_employee_ids = []
+                
+                # First try to get from existing payslips
+                existing_payslip_employee_ids = list(payroll_run.payslips.values_list('employee_id', flat=True))
+                if existing_payslip_employee_ids:
+                    selected_employee_ids = existing_payslip_employee_ids
+                # If no payslips, try to get from notes
+                elif payroll_run.notes and "Selected Employees:" in payroll_run.notes:
+                    try:
+                        notes_lines = payroll_run.notes.split('\n')
+                        for line in notes_lines:
+                            if line.strip().startswith("Selected Employees:"):
+                                ids_str = line.split("Selected Employees:")[1].strip()
+                                selected_employee_ids = [int(id.strip()) for id in ids_str.split(',') if id.strip()]
+                                break
+                    except (ValueError, IndexError):
+                        pass
+                
+                # Filter employees to prioritize those in this payroll run
+                if selected_employee_ids:
+                    # Show employees in payroll run first, then others
+                    payroll_run_contracts = active_contracts.filter(employee_id__in=selected_employee_ids)
+                    other_contracts = active_contracts.exclude(employee_id__in=selected_employee_ids)
+                    
+                    choices = []
+                    # Add payroll run employees first with a separator
+                    if payroll_run_contracts.exists():
+                        choices.append(('', f'--- {_("Employees in")} {payroll_run.run_name} ---'))
+                        choices.extend([
+                            (contract.employee_id.id, f"✓ {contract.employee_id}")
+                            for contract in payroll_run_contracts
+                            if contract.employee_id.is_active
+                        ])
+                    
+                    # Add other employees
+                    if other_contracts.exists():
+                        choices.append(('', f'--- {_("Other Employees")} ---'))
+                        choices.extend([
+                            (contract.employee_id.id, contract.employee_id)
+                            for contract in other_contracts
+                            if contract.employee_id.is_active
+                        ])
+                    
+                    self.fields["employee_id"].choices = choices
+                    
+            except PayrollRun.DoesNotExist:
+                pass
+        
+        if self.instance.pk is None and not payroll_run_id:
             self.initial["start_date"] = datetime.date.today().replace(day=1)
             self.initial["end_date"] = datetime.date.today()
 
@@ -382,11 +461,15 @@ class PayslipForm(ModelForm):
         model = payroll.models.models.Payslip
         fields = [
             "employee_id",
+            "payroll_run",
             "start_date",
             "end_date",
         ]
         exclude = ["is_active"]
         widgets = {
+            "payroll_run": forms.Select(attrs={
+                "class": "oh-select w-100"
+            }),
             "start_date": forms.DateInput(
                 attrs={
                     "type": "date",
@@ -425,6 +508,12 @@ class GeneratePayslipForm(HorillaForm):
         label="Employee",
         required=True,
     )
+    payroll_run = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        label=_("Payroll Run"),
+        help_text=_("Select a payroll run to link these payslips to"),
+    )
     start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
     end_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
 
@@ -453,6 +542,14 @@ class GeneratePayslipForm(HorillaForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Filter payroll runs to show only active, non-cancelled runs
+        from payroll.models.models import PayrollRun
+        self.fields["payroll_run"].queryset = PayrollRun.objects.filter(
+            is_active=True
+        ).exclude(status__in=["cancelled", "paid"]).order_by("-created_at")
+        self.fields["payroll_run"].empty_label = _("Select Payroll Run (Optional)")
+        
         self.fields["employee_id"].queryset = Employee.objects.filter(
             is_active=True,
             contract_set__isnull=False,
@@ -461,6 +558,7 @@ class GeneratePayslipForm(HorillaForm):
         self.fields["employee_id"].widget.attrs.update(
             {"class": "oh-select oh-select-2", "id": uuid.uuid4()}
         )
+        self.fields["payroll_run"].widget.attrs.update({"class": "oh-select w-100"})
         self.fields["start_date"].widget.attrs.update({"class": "oh-input w-100"})
         self.fields["group_name"].widget.attrs.update({"class": "oh-input w-100"})
         self.fields["end_date"].widget.attrs.update({"class": "oh-input w-100"})

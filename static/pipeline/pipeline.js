@@ -71,7 +71,6 @@ function getCookie(name) {
           'newSequences':JSON.stringify(newSequences),
         },
         success: function (response) {
-          // console.log(response);
         }
       });
     }
@@ -99,9 +98,6 @@ function getCookie(name) {
 
   $("[data-container='candidate']").on('DOMNodeInserted', function (e) {
     var candidate = $(e.target);
-    console.log("--------------------------------------------------------------");
-    console.log(candidate);
-    console.log("--------------------------------------------------------------");
     var stageId = $(this).attr('data-stage-id');
     candidateId = $(candidate).attr('data-candidate-id');
     if (candidateId != null) {
@@ -114,7 +110,6 @@ function getCookie(name) {
          },
          success: function (response) {
            var candidateId = $(this).attr('data-candidate-id');
-          //  console.log(response);
            $("#ohMessages").append(`
             <div class="oh-alert-container">
                   <div class="oh-alert oh-alert--animated oh-alert--${response.type}">
@@ -142,7 +137,6 @@ function getCookie(name) {
         'date':date
       },
       success: function (response) {
-        // console.log(response);
       }
     });
 

@@ -1,6 +1,18 @@
 {% load widget_tweaks %}
 {% load i18n %}
 
+<style>
+  /* Hide specific contract fields */
+  .hide-field-job_role,
+  .hide-field-shift,
+  .hide-field-notice_period_in_days,
+  .hide-field-work_type,
+  .hide-field-contract_document,
+  .hide-field-deduct_leave_from_basic_pay,
+  .hide-field-calculate_daily_leave_amount {
+    display: none !important;
+  }
+</style>
 <div class="oh-general__tab-target oh-profile-section" id="personal">
   <div class="oh-payslip__header">
     <div class="oh-payslip__header-left">

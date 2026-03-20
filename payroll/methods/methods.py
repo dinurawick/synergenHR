@@ -606,6 +606,12 @@ def save_payslip(**kwargs):
     instance.deduction = round(kwargs["deduction"], 2)
     instance.net_pay = round(kwargs["net_pay"], 2)
     instance.pay_head_data = kwargs["pay_data"]
+    instance.payroll_run = kwargs.get("payroll_run")  # Add payroll run
     instance.save()
     instance.installment_ids.set(kwargs["installments"])
+    
+    # Update payroll run totals if payroll_run is set
+    if instance.payroll_run:
+        instance.payroll_run.update_totals()
+    
     return instance
