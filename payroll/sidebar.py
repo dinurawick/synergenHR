@@ -21,11 +21,6 @@ SUBMENUS = [
         "accessibility": "payroll.sidebar.dasbhoard_accessibility",
     },
     {
-        "menu": trans("Payroll Runs"),
-        "redirect": reverse("payroll-run-list"),
-        "accessibility": "payroll.sidebar.payroll_run_accessibility",
-    },
-    {
         "menu": trans("Pay Items"),
         "redirect": "#",
         "accessibility": "payroll.sidebar.pay_items_accessibility",
@@ -60,11 +55,32 @@ SUBMENUS = [
         "redirect": reverse("filing-status-view"),
         "accessibility": "payroll.sidebar.federal_tax_accessibility",
     },
+    {
+        "menu": trans("Bank Management"),
+        "redirect": "#",
+        "accessibility": "payroll.sidebar.bank_management_accessibility",
+        "submenus": [
+            {
+                "menu": trans("Banks"),
+                "redirect": "/payroll/banks/",
+                "accessibility": "payroll.sidebar.bank_accessibility",
+            },
+            {
+                "menu": trans("Branches"),
+                "redirect": "/payroll/branches/",
+                "accessibility": "payroll.sidebar.branch_accessibility",
+            },
+        ],
+    },
 ]
 
 
 def dasbhoard_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("payroll.view_contract")
+
+
+def pay_items_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("payroll.view_allowance") or request.user.has_perm("payroll.view_deduction")
 
 
 def allowance_accessibility(request, submenu, user_perms, *args, **kwargs):
@@ -93,7 +109,3 @@ def bank_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def branch_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("employee.view_bankbranch")
-
-
-def payroll_run_accessibility(request, submenu, user_perms, *args, **kwargs):
-    return request.user.has_perm("payroll.view_payrollrun")

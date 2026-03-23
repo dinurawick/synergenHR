@@ -60,12 +60,12 @@ INSTALLED_APPS = [
     "base",
     "employee",
     "recruitment",
+    "payroll",  # MOVED BEFORE LEAVE
     "leave",
     "pms",
     "onboarding",
     "asset",
     "attendance",
-    "payroll",
     "widget_tweaks",
     "django_apscheduler",
 ]

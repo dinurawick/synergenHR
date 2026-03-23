@@ -72,6 +72,31 @@
             </div>
         </div>
 
+        {% if leave_request.cover_employee_id %}
+        <div class="oh-timeoff-modal__stats-container mt-3">
+            <div class="oh-timeoff-modal__stat w-100">
+                <span class="oh-timeoff-modal__stat-title">{% trans "Cover Employee" %}</span>
+                <a href="{% url 'employee-view-individual' leave_request.cover_employee_id.id %}" 
+                   class="oh-timeoff-modal__stat-count" 
+                   style="text-decoration: none; color: #0a0a5a;">
+                    <div class="d-flex align-items-center">
+                        <img src="{{leave_request.cover_employee_id.get_avatar}}" 
+                             class="oh-profile__image me-2" 
+                             style="width: 30px; height: 30px; border-radius: 50%;"
+                             alt="{{leave_request.cover_employee_id}}" />
+                        <div>
+                            <div class="fw-bold">{{leave_request.cover_employee_id}}</div>
+                            <small style="color: #6c757d;">
+                                {{leave_request.cover_employee_id.employee_work_info.department_id}} / 
+                                {{leave_request.cover_employee_id.employee_work_info.job_position_id}}
+                            </small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="oh-timeoff-modal__stats w-100 mt-3">
             <div class="oh-timeoff-modal__stat">
                 <span class="oh-timeoff-modal__stat-title">{% trans "Description" %}</span>

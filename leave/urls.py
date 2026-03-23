@@ -12,6 +12,11 @@ urlpatterns = [
     path("type-creation", views.leave_type_creation, name="type-creation"),
     path("type-view/", views.leave_type_view, name="type-view"),
     path(
+        "filter-employees-by-gender",
+        views.filter_employees_by_gender,
+        name="filter-employees-by-gender",
+    ),
+    path(
         "leave-type-individual-view/<int:id>",
         views.leave_type_individual_view,
         name="leave-type-individual-view",
@@ -176,6 +181,9 @@ urlpatterns = [
     path("leave-over-period", views.leave_over_period, name="leave-over-period"),
     path(
         "leave-request-create", views.leave_request_create, name="leave-request-create"
+    ),
+    path(
+        "calculate-end-date", views.calculate_end_date_ajax, name="calculate-end-date"
     ),
     path(
         "leave-allocation-request-view/",

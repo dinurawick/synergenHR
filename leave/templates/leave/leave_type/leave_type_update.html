@@ -14,7 +14,7 @@
 
 <div class="oh-wrapper d-flex justify-content-center">
     <div class="oh-onboarding-card">
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" onsubmit="checkYesOrNoFields()">
             {% csrf_token %}
             <div class="oh-onboarding-card__address-group">
                 <h2 class="oh-onboarding-card__section-title">{% trans "Update Leave Type" %}</h2>
@@ -228,6 +228,18 @@
                     <div class="col-sm-12 col-md-12 col-lg-6">
                         <div class="oh-input-group oh-label__info justify-content-between">
                             <div class="d-flex align-items-center">
+                                <label for="" class="oh-label">{{ form.exclude_weekends.label }}</label>
+                                <span class=" oh-info me-3" title="{% trans 'Do you need to exclude weekends from the requested leave days?' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3 ">
+                                <input type="checkbox" class="oh-switch__checkbox yesOrNo" id="id_exclude_weekends_toggle">
+                                {{ form.exclude_weekends.errors }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info justify-content-between">
+                            <div class="d-flex align-items-center">
                                 <label for="" class="oh-label">{{ form.is_encashable.label }}</label>
                                 <span class=" oh-info me-3" title="{% trans 'Do you need to encash pending leave days?' %}"></span>
                             </div>
@@ -237,10 +249,65 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Gender Restriction Field -->
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info">
+                            <label for="id_gender_restriction" class="oh-label">{{ form.gender_restriction.label }}</label>
+                            <span class=" oh-info me-3"
+                                title="{% trans 'Restrict this leave type to specific gender (e.g., maternity leave for females only)' %}"></span>
+                        </div>
+                        {{form.gender_restriction}}
+                        {{form.gender_restriction.errors}}
+                    </div>
+                    
+                    <!-- Conditional Formatting Fields -->
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info  justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <label for="" class="oh-label">{{ form.use_conditional_formatting.label }}</label>
+                                <span class=" oh-info me-3"
+                                    title="{% trans 'Apply Python-based rules for leave allocation (e.g., based on employee type)' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3 ">
+                                {{form.use_conditional_formatting}}
+                                {{form.use_conditional_formatting.errors}}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-sm-12 col-md-12 col-lg-6" id="conditional_formatting_rule_container" style="display:none;">
+                        <div class="oh-input-group oh-label__info">
+                            <label for="id_conditional_formatting_rule" class="oh-label">{{ form.conditional_formatting_rule.label }}</label>
+                            <span class=" oh-info me-3"
+                                title="{% trans 'Select a conditional formatting rule to apply' %}"></span>
+                        </div>
+                        {{form.conditional_formatting_rule}}
+                        {{form.conditional_formatting_rule.errors}}
+                    </div>
+                    
                     <div hidden>{{ form.require_approval }}</div>
                     <div hidden>{{ form.require_attachment }}</div>
                     <div hidden>{{ form.exclude_company_leave }}</div>
                     <div hidden>{{ form.exclude_holiday }}</div>
+                    <div hidden>{{ form.exclude_weekends }}</div>
+                    
+                    <!-- DEBUG: Remove after testing -->
+                    <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc; font-size: 12px;">
+                        <strong>DEBUG VALUES:</strong><br>
+                        Require Attachment: <span id="debug_attachment"></span><br>
+                        Exclude Weekends: <span id="debug_weekends"></span><br>
+                        Exclude Holiday: <span id="debug_holiday"></span><br>
+                        <button type="button" onclick="showDebug()" style="margin-top: 5px; padding: 5px 10px;">Refresh</button>
+                    </div>
+                    <script>
+                    function showDebug() {
+                        $('#debug_attachment').text($('#id_require_attachment').val() || 'EMPTY');
+                        $('#debug_weekends').text($('#id_exclude_weekends').val() || 'EMPTY');
+                        $('#debug_holiday').text($('#id_exclude_holiday').val() || 'EMPTY');
+                    }
+                    setTimeout(showDebug, 500);
+                    </script>
                 </div>
             </div>
 
@@ -463,9 +530,19 @@
         else {
             $('#id_exclude_public_leave').prop('checked', true);
         }
+        
+        // Debug: Log the actual value
+        console.log('exclude_weekends value:', $('#id_exclude_weekends').val());
+        
+        if ($('#id_exclude_weekends').val() == 'no' || !$('#id_exclude_weekends').val()) {
+            $('#id_exclude_weekends_toggle').prop('checked', false);
+        }
+        else {
+            $('#id_exclude_weekends_toggle').prop('checked', true);
+        }
     });
+    
     function checkYesOrNoFields() {
-
         if ($('#id_approval').is(":checked")) {
             $('#id_require_approval').val('yes');
         }
@@ -490,12 +567,109 @@
         else {
             $('#id_exclude_holiday').val('no');
         }
-
+        if ($('#id_exclude_weekends_toggle').is(":checked")) {
+            $('#id_exclude_weekends').val('yes');
+        }
+        else {
+            $('#id_exclude_weekends').val('no');
+        }
     }
 
     $('.yesOrNo').change(function () {
         checkYesOrNoFields()
     })
+    
+    // Toggle conditional formatting dropdown
+    function toggleConditionalFormattingDropdown(checkbox) {
+        if (checkbox.is(':checked')) {
+            $('#conditional_formatting_rule_container').show();
+        } else {
+            $('#conditional_formatting_rule_container').hide();
+            $('#id_conditional_formatting_rule').val('');
+        }
+    }
+    
+    // Initialize conditional formatting visibility on page load
+    toggleConditionalFormattingDropdown($('#id_use_conditional_formatting'));
+    
+    // Toggle conditional formatting dropdown and disable Total Days field
+    function toggleConditionalFormattingDropdown(checkbox) {
+        var $totalDaysContainer = $('.totalDaysContainer');
+        var $countField = $('#id_count');
+        
+        if (checkbox.is(':checked')) {
+            // Show conditional formatting dropdown
+            $('#conditional_formatting_rule_container').show();
+            
+            // Disable and grey out Total Days field
+            $countField.prop('disabled', true);
+            $countField.css({
+                'background-color': '#f0f0f0',
+                'cursor': 'not-allowed',
+                'opacity': '0.6'
+            });
+            $countField.val('0'); // Set to 0 as it will be calculated
+            
+            // Add info message
+            var $conditionalNote = $('#conditional-formatting-note');
+            if ($conditionalNote.length === 0) {
+                $conditionalNote = $('<div id="conditional-formatting-note" class="oh-alert oh-alert--warning mt-2" style="font-size: 12px;"></div>');
+                $totalDaysContainer.append($conditionalNote);
+            }
+            $conditionalNote.html('<i class="fa fa-info-circle"></i> Total days will be calculated automatically based on the conditional formatting rule.').show();
+            
+        } else {
+            // Hide conditional formatting dropdown
+            $('#conditional_formatting_rule_container').hide();
+            $('#id_conditional_formatting_rule').val('');
+            
+            // Re-enable Total Days field
+            $countField.prop('disabled', false);
+            $countField.css({
+                'background-color': '',
+                'cursor': '',
+                'opacity': ''
+            });
+            
+            // Remove info message
+            $('#conditional-formatting-note').hide();
+        }
+    }
+    
+    // Initialize conditional formatting visibility on page load
+    toggleConditionalFormattingDropdown($('#id_use_conditional_formatting'));
+    
+    // Handle conditional formatting toggle change
+    $('#id_use_conditional_formatting').change(function() {
+        toggleConditionalFormattingDropdown($(this));
+    });
+    
+    // Gender-based employee filtering
+    // Note: This adds a visual indicator about gender restriction
+    $('#id_gender_restriction').change(function() {
+        var selectedGender = $(this).val();
+        var $employeeSection = $('.oh-input-group').has('#id_employee_id');
+        
+        // Add a note to inform user about gender restriction
+        var $genderNote = $('#gender-filter-note');
+        if ($genderNote.length === 0) {
+            $genderNote = $('<div id="gender-filter-note" class="oh-alert oh-alert--info mt-2" style="font-size: 12px;"></div>');
+            $employeeSection.append($genderNote);
+        }
+        
+        if (selectedGender === 'male') {
+            $genderNote.html('<i class="fa fa-info-circle"></i> Only male employees can request this leave type.').show();
+        } else if (selectedGender === 'female') {
+            $genderNote.html('<i class="fa fa-info-circle"></i> Only female employees can request this leave type.').show();
+        } else if (selectedGender === 'other') {
+            $genderNote.html('<i class="fa fa-info-circle"></i> Only employees with "other" gender can request this leave type.').show();
+        } else {
+            $genderNote.hide();
+        }
+    });
+    
+    // Initialize gender note on page load
+    $('#id_gender_restriction').trigger('change');
 </script>
 
 {% endblock %}

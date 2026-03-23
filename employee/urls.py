@@ -339,6 +339,7 @@ urlpatterns = [
         name="document-delete",
     ),
     path("organisation-chart/", views.organisation_chart, name="organisation-chart"),
+    path("company-tree/", views.company_tree_view, name="company-tree"),
     path("delete-policies", policies.delete_policies, name="delete-policies"),
     path(
         "disciplinary-actions/",
@@ -425,4 +426,7 @@ urlpatterns = [
         name="employee-tag-delete",
         kwargs={"model": EmployeeTag, "HttpResponse": True},
     ),
+    # Bank registry API endpoints
+    path("api/get-banks/", views.get_banks_api, name="get-banks-api"),
+    path("api/get-branches/", views.get_branches_api, name="get-branches-api"),
 ]

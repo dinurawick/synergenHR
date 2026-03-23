@@ -743,6 +743,99 @@ class EmployeeWorkInformation(models.Model):
         return self
 
 
+class Bank(HorillaModel):
+    """
+    Bank model - Represents a bank institution in a specific country
+    """
+    
+    COUNTRY_CHOICES = [
+        ('LK', 'Sri Lanka'),
+        ('RW', 'Rwanda'),
+    ]
+    
+    name = models.CharField(max_length=100, verbose_name=_("Bank Name"))
+    country = models.CharField(
+        max_length=2, 
+        choices=COUNTRY_CHOICES,
+        verbose_name=_("Country")
+    )
+    code = models.CharField(
+        max_length=20, 
+        unique=True,
+        verbose_name=_("Bank Code")
+    )
+    objects = models.Manager()
+
+    class Meta:
+        verbose_name = _("Bank")
+        verbose_name_plural = _("Banks")
+        unique_together = [['name', 'country']]
+        ordering = ['country', 'name']
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_country_display()})"
+
+    def clean(self):
+        super().clean()
+        if self.code:
+            self.code = self.code.upper()
+
+
+class BankBranch(HorillaModel):
+    """
+    BankBranch model - Represents a branch of a bank
+    """
+    
+    bank = models.ForeignKey(
+        Bank,
+        on_delete=models.PROTECT,
+        related_name='branches',
+        verbose_name=_("Bank")
+    )
+    name = models.CharField(max_length=100, verbose_name=_("Branch Name"))
+    branch_code = models.CharField(
+        max_length=20,
+        verbose_name=_("Branch Code")
+    )
+    bank_code_1 = models.CharField(
+        max_length=50,
+        verbose_name=_("Bank Code #1"),
+        help_text=_("Primary bank code (e.g., SWIFT code, routing number)")
+    )
+    bank_code_2 = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name=_("Bank Code #2"),
+        help_text=_("Secondary bank code (optional)")
+    )
+    address = models.TextField(max_length=255, blank=True, verbose_name=_("Address"))
+    city = models.CharField(max_length=50, blank=True, verbose_name=_("City"))
+    state = models.CharField(max_length=50, blank=True, verbose_name=_("State/Province"))
+    objects = models.Manager()
+
+    class Meta:
+        verbose_name = _("Bank Branch")
+        verbose_name_plural = _("Bank Branches")
+        unique_together = [['bank', 'branch_code']]
+        ordering = ['bank', 'name']
+
+    def __str__(self) -> str:
+        return f"{self.bank.name} - {self.name}"
+
+    def clean(self):
+        super().clean()
+        if self.branch_code:
+            self.branch_code = self.branch_code.upper()
+        if not self.is_active and self.bank.is_active:
+            # Check if any active employee bank details reference this branch
+            if hasattr(self, 'employeebankdetails_set'):
+                active_refs = self.employeebankdetails_set.filter(is_active=True).exists()
+                if active_refs:
+                    raise ValidationError(
+                        _("Cannot deactivate branch while it is referenced by active employee bank details")
+                    )
+
+
 class EmployeeBankDetails(HorillaModel):
     """
     EmployeeBankDetails model
@@ -755,19 +848,41 @@ class EmployeeBankDetails(HorillaModel):
         related_name="employee_bank_details",
         verbose_name=_("Employee"),
     )
-    bank_name = models.CharField(max_length=50)
+    # New ForeignKey fields for bank registry system
+    bank = models.ForeignKey(
+        Bank,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_bank_details",
+        verbose_name=_("Bank"),
+        help_text=_("Select bank from registry")
+    )
+    bank_branch = models.ForeignKey(
+        BankBranch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employee_bank_details",
+        verbose_name=_("Branch"),
+        help_text=_("Select branch from registry")
+    )
+    
+    # Legacy fields - kept for backward compatibility and migration
+    bank_name = models.CharField(max_length=50, blank=True, null=True)
+    branch = models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Branch (Legacy)"))
+    
     account_number = models.CharField(
         max_length=50,
         null=True,
         blank=False,
     )
-    branch = models.CharField(max_length=50, null=True)
-    address = models.TextField(max_length=255, null=True)
+    address = models.TextField(max_length=255, null=True, blank=True)
     country = models.CharField(max_length=50, blank=True, null=True)
     state = models.CharField(max_length=50, blank=True)
     city = models.CharField(max_length=50, blank=True)
     any_other_code1 = models.CharField(
-        max_length=50, verbose_name="Bank Code #1", null=True
+        max_length=50, verbose_name="Bank Code #1", null=True, blank=True
     )
     any_other_code2 = models.CharField(
         max_length=50, null=True, blank=True, verbose_name="Bank Code #2"
@@ -782,7 +897,8 @@ class EmployeeBankDetails(HorillaModel):
         verbose_name_plural = _("Employee Bank Details")
 
     def __str__(self) -> str:
-        return f"{self.employee_id}-{self.bank_name}"
+        bank_display = self.bank.name if self.bank else self.bank_name
+        return f"{self.employee_id}-{bank_display}"
 
     def clean(self):
         if self.account_number is not None:

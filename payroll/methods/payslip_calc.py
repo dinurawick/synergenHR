@@ -276,11 +276,15 @@ def calculate_allowance(**kwargs):
         end_date (datetime.date): The end date of the payroll period.
 
     """
+    from payroll.methods.conditional_executor import execute_individual_rule
+    
     employee = kwargs["employee"]
     start_date = kwargs["start_date"]
     end_date = kwargs["end_date"]
     basic_pay = kwargs["basic_pay"]
     day_dict = kwargs["day_dict"]
+    contract = kwargs.get("contract")
+    
     specific_allowances = Allowance.objects.filter(specific_employees=employee)
     conditional_allowances = Allowance.objects.filter(is_condition_based=True).exclude(
         exclude_employees=employee
@@ -302,8 +306,37 @@ def calculate_allowance(**kwargs):
     no_tax_allowances = []
     tax_allowances_amt = []
     no_tax_allowances_amt = []
-    # Append allowances based on condition, or unconditionally to employee
+    
+    # Context for conditional formatting
+    context = {
+        'employee': employee,
+        'basic_pay': basic_pay,
+        'contract': contract,
+        'start_date': start_date,
+        'end_date': end_date,
+        'day_dict': day_dict
+    }
+    
+    # Dictionary to store conditional formatting amounts
+    conditional_amounts = {}
+    
+    # Process each allowance individually
     for allowance in allowances:
+        should_include = False
+        
+        # Check if allowance has individual conditional formatting rule
+        if hasattr(allowance, 'use_conditional_formatting') and allowance.use_conditional_formatting and hasattr(allowance, 'conditional_formatting_rule') and allowance.conditional_formatting_rule:
+            # Execute the specific rule for this allowance
+            rule_result = execute_individual_rule(allowance.conditional_formatting_rule, context)
+            if rule_result and rule_result['condition']:
+                should_include = True
+                employee_allowances.append(allowance)
+                # Store the calculated amount for later use
+                conditional_amounts[allowance.id] = rule_result['amount']
+            # If condition not met, skip this allowance entirely
+            continue
+        
+        # Traditional condition-based logic
         if allowance.is_condition_based:
             conditions = list(
                 allowance.other_conditions.values_list("field", "condition", "value")
@@ -350,7 +383,11 @@ def calculate_allowance(**kwargs):
             no_tax_allowances.append(allowance)
     # Find and append the amount of tax_allowances
     for allowance in tax_allowances:
-        if allowance.is_fixed:
+        # Check if this allowance has a conditional formatting amount
+        if allowance.id in conditional_amounts:
+            amount = conditional_amounts[allowance.id]
+            tax_allowances_amt.append(amount)
+        elif allowance.is_fixed:
             amount = allowance.amount
             kwargs["amount"] = amount
             kwargs["component"] = allowance
@@ -377,7 +414,11 @@ def calculate_allowance(**kwargs):
             tax_allowances_amt.append(amount)
     # Find and append the amount of not tax_allowances
     for allowance in no_tax_allowances:
-        if allowance.is_fixed:
+        # Check if this allowance has a conditional formatting amount
+        if allowance.id in conditional_amounts:
+            amount = conditional_amounts[allowance.id]
+            no_tax_allowances_amt.append(amount)
+        elif allowance.is_fixed:
             amount = allowance.amount
             kwargs["amount"] = amount
             kwargs["component"] = allowance
@@ -421,6 +462,7 @@ def calculate_allowance(**kwargs):
             "amount": amount,
         }
         serialized_allowances.append(serialized_allowance)
+    
     return {"allowances": serialized_allowances}
 
 
@@ -674,6 +716,8 @@ def calculate_post_tax_deduction(*_args, **kwargs):
         A dictionary containing the pre-tax deductions as the "post_tax_deductions" key.
 
     """
+    from payroll.methods.conditional_executor import execute_individual_rule
+    
     employee = kwargs["employee"]
     start_date = kwargs["start_date"]
     end_date = kwargs["end_date"]
@@ -681,6 +725,18 @@ def calculate_post_tax_deduction(*_args, **kwargs):
     total_allowance = kwargs["total_allowance"]
     basic_pay = kwargs["basic_pay"]
     day_dict = kwargs["day_dict"]
+    contract = kwargs.get("contract")
+    
+    # Context for conditional formatting
+    context = {
+        'employee': employee,
+        'basic_pay': basic_pay,
+        'contract': contract,
+        'start_date': start_date,
+        'end_date': end_date,
+        'day_dict': day_dict
+    }
+    
     specific_deductions = models.Deduction.objects.filter(
         specific_employees=employee, is_pretax=False, is_tax=False
     )
@@ -703,8 +759,23 @@ def calculate_post_tax_deduction(*_args, **kwargs):
     post_tax_deductions_amt = []
     serialized_deductions = []
     serialized_net_pay_deductions = []
+    
+    # Dictionary to store conditional formatting amounts
+    conditional_deduction_amounts = {}
 
     for deduction in deductions:
+        # Check if deduction has individual conditional formatting rule
+        if hasattr(deduction, 'use_conditional_formatting') and deduction.use_conditional_formatting and hasattr(deduction, 'conditional_formatting_rule') and deduction.conditional_formatting_rule:
+            # Execute the specific rule for this deduction
+            rule_result = execute_individual_rule(deduction.conditional_formatting_rule, context)
+            if rule_result and rule_result['condition']:
+                post_tax_deductions.append(deduction)
+                # Store the calculated amount for later use
+                conditional_deduction_amounts[deduction.id] = rule_result['amount']
+            # If condition not met, skip this deduction entirely
+            continue
+        
+        # Traditional condition-based logic
         if deduction.is_condition_based:
             condition_field = deduction.field
             condition_operator = deduction.condition
@@ -718,7 +789,11 @@ def calculate_post_tax_deduction(*_args, **kwargs):
         else:
             post_tax_deductions.append(deduction)
     for deduction in post_tax_deductions:
-        if deduction.is_fixed:
+        # Check if this deduction has a conditional formatting amount
+        if deduction.id in conditional_deduction_amounts:
+            amount = conditional_deduction_amounts[deduction.id]
+            post_tax_deductions_amt.append(amount)
+        elif deduction.is_fixed:
             amount = deduction.amount
             kwargs["amount"] = amount
             kwargs["component"] = deduction
@@ -790,6 +865,7 @@ def calculate_post_tax_deduction(*_args, **kwargs):
         if deduction.based_on == "net_pay":
             serialized_net_pay_deduction = {"deduction": deduction}
             serialized_net_pay_deductions.append(serialized_net_pay_deduction)
+    
     return {
         "post_tax_deductions": serialized_deductions,
         "net_pay_deduction": serialized_net_pay_deductions,

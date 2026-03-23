@@ -2981,7 +2981,15 @@ def widget_filter(request):
     """
     This method is used to return all the ids of the employees
     """
-    ids = EmployeeFilter(request.GET).qs.values_list("id", flat=True)
+    queryset = Employee.objects.all()
+    
+    # Check for gender filter parameter (from leave type gender restriction)
+    gender_filter = request.GET.get('gender')
+    if gender_filter and gender_filter in ['male', 'female', 'other']:
+        queryset = queryset.filter(gender=gender_filter)
+    
+    # Apply the employee filter
+    ids = EmployeeFilter(request.GET, queryset=queryset).qs.values_list("id", flat=True)
     return JsonResponse({"ids": list(ids)})
 
 
@@ -3471,6 +3479,102 @@ def organisation_chart(request):
 
 
 @login_required
+def company_tree_view(request):
+    """
+    This method displays the ENTIRE company organizational tree
+    Shows all top-level managers and their complete hierarchies
+    """
+    selected_company = request.session.get("selected_company")
+    
+    # Helper function to recursively create the hierarchy structure
+    def create_hierarchy(manager):
+        """
+        Recursively build hierarchy tree for a manager
+        """
+        nodes = []
+        
+        # Get all direct subordinates
+        subordinates = Employee.objects.filter(
+            is_active=True, 
+            employee_work_info__reporting_manager_id=manager
+        ).exclude(id=manager.id).order_by('employee_first_name')
+
+        # Build node for each subordinate
+        for employee in subordinates:
+            nodes.append({
+                "name": employee.get_full_name(),
+                "title": getattr(
+                    employee.get_job_position(), "job_position", _("Not set")
+                ),
+                "department": getattr(
+                    employee.get_department(), "department", _("Not set")
+                ),
+                "className": "middle-level",
+                "children": create_hierarchy(employee),
+            })
+        
+        return nodes
+
+    # Find all top-level managers (employees with no reporting manager)
+    if selected_company and selected_company != "all":
+        top_managers = Employee.objects.filter(
+            is_active=True,
+            employee_work_info__reporting_manager_id__isnull=True,
+            employee_work_info__company_id=selected_company,
+        ).order_by('employee_first_name')
+    else:
+        top_managers = Employee.objects.filter(
+            is_active=True,
+            employee_work_info__reporting_manager_id__isnull=True,
+        ).order_by('employee_first_name')
+
+    # Build the complete tree structure
+    if top_managers.count() == 1:
+        # Single top manager - show as single tree
+        manager = top_managers.first()
+        tree_data = {
+            "name": manager.get_full_name(),
+            "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+            "department": getattr(manager.get_department(), "department", _("Not set")),
+            "children": create_hierarchy(manager),
+        }
+    elif top_managers.count() > 1:
+        # Multiple top managers - create a virtual root
+        children = []
+        for manager in top_managers:
+            children.append({
+                "name": manager.get_full_name(),
+                "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+                "department": getattr(manager.get_department(), "department", _("Not set")),
+                "children": create_hierarchy(manager),
+            })
+        
+        tree_data = {
+            "name": _("Company Organization"),
+            "title": _("All Departments"),
+            "department": "",
+            "className": "top-level",
+            "children": children,
+        }
+    else:
+        # No top managers found
+        tree_data = {
+            "name": _("No Organization Structure"),
+            "title": _("Please set reporting managers"),
+            "department": "",
+            "children": [],
+        }
+
+    context = {
+        "tree_data": json.dumps(tree_data),
+        "total_employees": Employee.objects.filter(is_active=True).count(),
+        "top_managers_count": top_managers.count(),
+    }
+    
+    return render(request, "organisation_chart/company_tree.html", context=context)
+
+
+@login_required
 @permission_required("payroll.add_encashmentgeneralsettings")
 def encashment_condition_create(request):
     """
@@ -3657,3 +3761,210 @@ def employee_tag_update(request, tag_id):
         "base/employee_tag/employee_tag_form.html",
         {"form": form, "tag_id": tag_id},
     )
+
+
+
+# Bank Management Views
+
+@login_required
+@permission_required("employee.view_bank")
+def view_banks(request):
+    """
+    View to list all banks
+    """
+    from employee.models import Bank
+    
+    banks = Bank.objects.filter(is_active=True).order_by("country", "name")
+    
+    context = {
+        "banks": banks,
+    }
+    return render(request, "employee/bank/bank_list.html", context)
+
+
+@login_required
+@permission_required("employee.add_bank")
+def create_bank(request):
+    """
+    View to create a new bank
+    """
+    from employee.forms import BankForm
+    
+    if request.method == "POST":
+        form = BankForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Bank created successfully"))
+            return HttpResponse("<script>window.location.reload()</script>")
+        return render(request, "employee/bank/bank_form.html", {"form": form})
+    
+    form = BankForm()
+    return render(request, "employee/bank/bank_form.html", {"form": form})
+
+
+@login_required
+@permission_required("employee.change_bank")
+def update_bank(request, obj_id):
+    """
+    View to update a bank
+    """
+    from employee.models import Bank
+    from employee.forms import BankForm
+    
+    bank = get_object_or_404(Bank, id=obj_id)
+    
+    if request.method == "POST":
+        form = BankForm(request.POST, instance=bank)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Bank updated successfully"))
+            return HttpResponse("<script>window.location.reload()</script>")
+        return render(request, "employee/bank/bank_form.html", {"form": form})
+    
+    form = BankForm(instance=bank)
+    return render(request, "employee/bank/bank_form.html", {"form": form})
+
+
+@login_required
+@permission_required("employee.delete_bank")
+def delete_bank(request, obj_id):
+    """
+    View to delete a bank
+    """
+    from employee.models import Bank
+    
+    try:
+        bank = get_object_or_404(Bank, id=obj_id)
+        bank_name = bank.name
+        bank.delete()
+        messages.success(request, _("Bank '{}' deleted successfully").format(bank_name))
+    except ProtectedError:
+        messages.error(request, _("Cannot delete bank as it is referenced by branches or employee bank details"))
+    except Exception as e:
+        messages.error(request, _("Error deleting bank: {}").format(str(e)))
+    
+    # Return the updated bank list for HTMX
+    banks = Bank.objects.filter(is_active=True).order_by("country", "name")
+    return render(request, "employee/bank/bank_list.html", {"banks": banks})
+
+
+@login_required
+@permission_required("employee.view_bankbranch")
+def view_branches(request):
+    """
+    View to list all bank branches
+    """
+    from employee.models import BankBranch
+    
+    branches = BankBranch.objects.filter(is_active=True).select_related("bank").order_by("bank__name", "name")
+    
+    context = {
+        "branches": branches,
+    }
+    return render(request, "employee/bank/branch_list.html", context)
+
+
+@login_required
+@permission_required("employee.add_bankbranch")
+def create_branch(request):
+    """
+    View to create a new bank branch
+    """
+    from employee.forms import BankBranchForm
+    
+    if request.method == "POST":
+        form = BankBranchForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Branch created successfully"))
+            return HttpResponse("<script>window.location.reload()</script>")
+        return render(request, "employee/bank/branch_form.html", {"form": form})
+    
+    form = BankBranchForm()
+    return render(request, "employee/bank/branch_form.html", {"form": form})
+
+
+@login_required
+@permission_required("employee.change_bankbranch")
+def update_branch(request, obj_id):
+    """
+    View to update a bank branch
+    """
+    from employee.models import BankBranch
+    from employee.forms import BankBranchForm
+    
+    branch = get_object_or_404(BankBranch, id=obj_id)
+    
+    if request.method == "POST":
+        form = BankBranchForm(request.POST, instance=branch)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Branch updated successfully"))
+            return HttpResponse("<script>window.location.reload()</script>")
+        return render(request, "employee/bank/branch_form.html", {"form": form})
+    
+    form = BankBranchForm(instance=branch)
+    return render(request, "employee/bank/branch_form.html", {"form": form})
+
+
+@login_required
+@permission_required("employee.delete_bankbranch")
+def delete_branch(request, obj_id):
+    """
+    View to delete a bank branch
+    """
+    from employee.models import BankBranch
+    
+    try:
+        branch = get_object_or_404(BankBranch, id=obj_id)
+        branch_name = branch.name
+        branch.delete()
+        messages.success(request, _("Branch '{}' deleted successfully").format(branch_name))
+    except ProtectedError:
+        messages.error(request, _("Cannot delete branch as it is referenced by employee bank details"))
+    except Exception as e:
+        messages.error(request, _("Error deleting branch: {}").format(str(e)))
+    
+    # Return the updated branch list for HTMX
+    branches = BankBranch.objects.filter(is_active=True).select_related("bank").order_by("bank__name", "name")
+    return render(request, "employee/bank/branch_list.html", {"branches": branches})
+
+
+# API endpoints for cascading dropdowns
+
+@login_required
+def get_banks_api(request):
+    """
+    API endpoint to get banks filtered by country
+    """
+    from employee.models import Bank
+    
+    country = request.GET.get("country")
+    
+    if not country:
+        return JsonResponse({"error": "Country parameter is required"}, status=400)
+    
+    banks = Bank.objects.filter(country=country, is_active=True).values("id", "name", "code")
+    
+    return JsonResponse({"banks": list(banks)})
+
+
+@login_required
+def get_branches_api(request):
+    """
+    API endpoint to get branches filtered by bank
+    """
+    from employee.models import BankBranch
+    
+    bank_id = request.GET.get("bank_id")
+    
+    if not bank_id or not bank_id.isdigit():
+        return JsonResponse({"error": "Invalid bank_id"}, status=400)
+    
+    bank_id = int(bank_id)
+    
+    branches = BankBranch.objects.filter(
+        bank_id=bank_id, is_active=True
+    ).values("id", "name", "branch_code", "bank_code_1", "bank_code_2")
+    
+    return JsonResponse({"branches": list(branches)})

@@ -1,0 +1,92 @@
+{% load i18n %}
+{% if messages %}
+    <div class="oh-wrapper">
+        {% for message in messages %}
+        <div class="oh-alert-container">
+            <div class="oh-alert oh-alert--animated {{message.tags}}">
+                {{ message }}
+            </div>
+        </div>
+        {% endfor %}
+        <span hx-get="{% url 'view-banks' %}" hx-target="#BankList" hx-trigger="load"></span>
+    </div>
+{% endif %}
+<div class="oh-modal__dialog-header">
+    <span class="oh-modal__dialog-title">
+        <h5>{% if form.instance.pk %}{% trans "Edit Bank" %}{% else %}{% trans "Create Bank" %}{% endif %}</h5>
+    </span>
+    <button type="button" class="oh-modal__close" data-dismiss="oh-modal" aria-label="Close"
+        data-toggle="oh-modal-toggle">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+<div class="oh-modal__dialog-body bank-form">
+    <form hx-post="{% if form.instance.pk %}{% url 'update-bank' form.instance.id %}{% else %}{% url 'create-bank' %}{% endif %}" hx-target="#objectCreateModalTarget">
+        {% csrf_token %} 
+        {{ form.as_p }}
+        <div class="oh-modal__dialog-footer">
+            <button type="submit" class="oh-btn oh-btn--secondary oh-btn--shadow">
+                {% trans "Save" %}
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .bank-form .oh-input-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .bank-form label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-weight: 400;
+        font-size: 0.8125rem;
+        color: #6b7280;
+    }
+    
+    .bank-form input[type="text"],
+    .bank-form select,
+    .bank-form textarea {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        transition: border-color 0.15s ease-in-out;
+    }
+    
+    .bank-form input[type="text"]:focus,
+    .bank-form select:focus,
+    .bank-form textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .bank-form textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    .bank-form .oh-modal__dialog-footer {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .bank-form p {
+        margin-bottom: 1.5rem;
+    }
+    
+    .bank-form p:last-of-type {
+        margin-bottom: 0;
+    }
+    
+    /* Hide help text */
+    .bank-form .helptext {
+        display: none;
+    }
+</style>

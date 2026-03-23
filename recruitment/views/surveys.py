@@ -113,6 +113,12 @@ def candidate_survey(request):
     Used to render survey form to the candidate
     """
     MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB in bytes
+    
+    # Check if candidate session exists
+    if "candidate" not in request.session:
+        messages.error(request, _("Please submit your application first."))
+        return redirect("open-recruitments")
+    
     candidate_json = request.session["candidate"]
     candidate_dict = json.loads(candidate_json)
     rec_id = candidate_dict[0]["fields"]["recruitment_id"]
@@ -120,10 +126,19 @@ def candidate_survey(request):
     job = JobPosition.objects.get(id=job_id)
     recruitment = Recruitment.objects.get(id=rec_id)
     stage_id = candidate_dict[0]["fields"]["stage_id"]
-    candidate_dict[0]["fields"]["recruitment_id"] = recruitment
-    candidate_dict[0]["fields"]["job_position_id"] = job
-    candidate_dict[0]["fields"]["stage_id"] = Stage.objects.get(id=stage_id)
-    candidate = Candidate(**candidate_dict[0]["fields"])
+    
+    # Prepare fields for Candidate object, excluding problematic fields
+    candidate_fields = candidate_dict[0]["fields"].copy()
+    candidate_fields["recruitment_id"] = recruitment
+    candidate_fields["job_position_id"] = job
+    candidate_fields["stage_id"] = Stage.objects.get(id=stage_id)
+    
+    # Remove fields that should not be set directly (auto-managed fields)
+    fields_to_exclude = ["created_by", "modified_by", "created_at", "modified_at"]
+    for field in fields_to_exclude:
+        candidate_fields.pop(field, None)
+    
+    candidate = Candidate(**candidate_fields)
     form = SurveyForm(recruitment=recruitment).form
     if request.method == "POST":
         if not Candidate.objects.filter(

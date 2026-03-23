@@ -509,11 +509,9 @@
                             {% for task in candidate.candidate_task.all %}
                             <div class="oh-sticky-table__tr">
                                 <div class="oh-sticky-table__td">
-                                    <div class="oh-sticky-table__sd d-flex justify-content-between"
-                                        style="width: 500px;overflow: hidden;">
+                                    <div class="oh-sticky-table__sd d-flex justify-content-between" style="min-width: 500px;">
                                         <div class="oh-profile oh-profile--md">
-                                            <span class="oh-profile__name oh-text--dark">{{
-                                                task.onboarding_task_id.task_title }}</span>
+                                            <span class="oh-profile__name oh-text--dark">{{ task.onboarding_task_id.task_title }}</span>
                                         </div>
                                         <span
                                             class="oh-recuritment_tag  {% if task.status == 'done' %} done-task {% elif task.status == 'scheduled' %} scheduled-task{% elif task.status == 'ongoing' %} ongoing-task{% elif task.status == 'stuck' %} dd stuck-task {% elif task.status == 'todo' %} todo-task{% endif %}">

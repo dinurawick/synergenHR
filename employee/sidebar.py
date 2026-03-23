@@ -59,6 +59,10 @@ SUBMENUS = [
         "menu": trans("Organization Chart"),
         "redirect": reverse("organisation-chart"),
     },
+    {
+        "menu": trans("Company Tree"),
+        "redirect": reverse("company-tree"),
+    },
 ]
 
 

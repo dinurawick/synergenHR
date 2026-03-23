@@ -347,6 +347,7 @@ $(document).ready(function () {
           
           $.each(joined_employees, function (key, value) {
             var id = value.employee_id;
+            var contract_id = value.contract_id;
             var elem;
             
             // Get contract status colors - matching contract page colors
@@ -360,17 +361,20 @@ $(document).ready(function () {
             var borderColor = statusColors[value.contract_status] || '#6c757d';
             var iconColor = borderColor;
             
+            // Determine the link URL - use contract page if contract_id exists, otherwise employee view
+            var linkUrl = contract_id ? `/payroll/update-contract/${contract_id}` : `/employee/employee-view/${id}/#tab_2`;
+            
             if (value.is_active) {
               // Active employee - use contract status color
               activeCount++;
-              elem = `<li class='employee_id' style="cursor: pointer; padding: 8px 12px; margin: 4px 0; background: #f8f9fa; border-radius: 6px; border-left: 4px solid ${borderColor}; transition: all 0.2s ease; font-size: 14px;" data-id=${id} onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'" onclick="window.open('/employee/employee-view/${id}/#tab_2', '_blank')"> 
+              elem = `<li class='employee_id' style="cursor: pointer; padding: 8px 12px; margin: 4px 0; background: #f8f9fa; border-radius: 6px; border-left: 4px solid ${borderColor}; transition: all 0.2s ease; font-size: 14px;" data-id=${id} onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'" onclick="window.open('${linkUrl}', '_blank')"> 
                 <i class="fas fa-user" style="color: ${iconColor}; margin-right: 8px;"></i><span style="text-decoration: underline; color: #007bff;">${value.employee_name}</span> 
                 <span style="color: ${iconColor}; font-size: 11px; font-weight: 500; text-transform: capitalize;">(${value.contract_status})</span>
               </li>`;
             } else {
               // Archived employee - grayed out with contract status
               archivedCount++;
-              elem = `<li class='employee_id archived' style="cursor: pointer; padding: 8px 12px; margin: 4px 0; background: #f5f5f5; border-radius: 6px; border-left: 4px solid ${borderColor}; transition: all 0.2s ease; font-size: 14px; opacity: 0.7;" data-id=${id} onmouseover="this.style.background='#e9ecef'; this.style.opacity='0.8'" onmouseout="this.style.background='#f5f5f5'; this.style.opacity='0.7'" onclick="window.open('/employee/employee-view/${id}/#tab_2', '_blank')"> 
+              elem = `<li class='employee_id archived' style="cursor: pointer; padding: 8px 12px; margin: 4px 0; background: #f5f5f5; border-radius: 6px; border-left: 4px solid ${borderColor}; transition: all 0.2s ease; font-size: 14px; opacity: 0.7;" data-id=${id} onmouseover="this.style.background='#e9ecef'; this.style.opacity='0.8'" onmouseout="this.style.background='#f5f5f5'; this.style.opacity='0.7'" onclick="window.open('${linkUrl}', '_blank')"> 
                 <i class="fas fa-archive" style="color: #dc3545; margin-right: 8px;"></i><span style="text-decoration: underline; color: #007bff;">${value.employee_name}</span> 
                 <span style="color: #dc3545; font-size: 12px; font-weight: 500;">(Archived)</span>
                 <span style="color: ${iconColor}; font-size: 11px; font-weight: 500; text-transform: capitalize; margin-left: 4px;">[${value.contract_status}]</span>

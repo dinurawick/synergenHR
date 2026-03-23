@@ -163,6 +163,14 @@
                 </div>
                 <div class="oh-timeoff-modal__stats">
                     <div class="oh-timeoff-modal__stat">
+                        <span class="oh-timeoff-modal__stat-title">{% trans "Exclude Weekends" %}</span>
+                        <div class="oh-timeoff-modal__stat-count">
+                            {{leave_type.get_exclude_weekends_display}}
+                        </div>
+                    </div>
+                </div>
+                <div class="oh-timeoff-modal__stats">
+                    <div class="oh-timeoff-modal__stat">
                         <span class="oh-timeoff-modal__stat-title">{% trans "Is Encashable" %}</span>
                         <div class="oh-timeoff-modal__stat-count">{{leave_type.is_encashable|yes_no}}</div>
                     </div>

@@ -139,12 +139,46 @@ function conditionalVisibility() {
 
   if ($("#id_include_active_employees").is(":checked")) {
     $("#id_is_condition_based").prop("checked",false)
-    $(
-      "#id_specific_employees, [for=id_specific_employees],#id_is_condition_based, [for=id_is_condition_based]"
-    ).hide();
-    $(
-      "#id_specific_employees, [for=id_specific_employees],#id_is_condition_based, [for=id_is_condition_based]"
-    ).parent().hide();
+    
+    // Only fetch if not already populated
+    if (!$("#id_specific_employees").data('employees-loaded')) {
+      // Fetch and populate active employees
+      $.ajax({
+        url: '/payroll/get-active-employees',
+        method: 'GET',
+        success: function(data) {
+          // Clear the select completely and rebuild
+          $("#id_specific_employees").empty();
+          
+          // Add all active employees as options and select them
+          data.employees.forEach(function(employee) {
+            var newOption = new Option(employee.text, employee.id, true, true);
+            $("#id_specific_employees").append(newOption);
+          });
+          
+          // Mark as loaded
+          $("#id_specific_employees").data('employees-loaded', true);
+          
+          // Trigger change to update Select2
+          $("#id_specific_employees").trigger('change');
+        }
+      });
+    }
+    
+    // Show the specific employees field so users can remove individuals
+    $("#id_specific_employees, [for=id_specific_employees]").show();
+    $("#id_specific_employees, [for=id_specific_employees]").parent().show();
+    
+    // Hide the Filter button/popup for specific_employees when include all is checked
+    $("#id_specific_employees").closest('div').find('[data-toggle="oh-modal-toggle"]').hide();
+    
+    // Hide the Exclude Employees field when include all is checked
+    $("#id_exclude_employees, [for=id_exclude_employees]").hide();
+    $("#id_exclude_employees, [for=id_exclude_employees]").parent().hide();
+    
+    // Hide condition based fields
+    $("#id_is_condition_based, [for=id_is_condition_based]").hide();
+    $("#id_is_condition_based, [for=id_is_condition_based]").parent().hide();
     $(
       "#id_field,[for=id_field], #id_condition,[for=id_condition], #id_value,[for=id_value]"
     ).hide();
@@ -152,6 +186,12 @@ function conditionalVisibility() {
       "#id_field,[for=id_field], #id_condition,[for=id_condition], #id_value,[for=id_value]"
     ).parent().hide();
   } else {
+    // Clear the loaded flag when unchecked
+    $("#id_specific_employees").data('employees-loaded', false);
+    
+    // Show the Filter button again when unchecked
+    $("#id_specific_employees").closest('div').find('[data-toggle="oh-modal-toggle"]').show();
+    
     $(
       "#id_specific_employees, [for=id_specific_employees],#id_is_condition_based, [for=id_is_condition_based]"
     ).show();
@@ -168,8 +208,8 @@ function conditionalVisibility() {
     }
   }
   if (
-    $("#id_is_condition_based").is(":checked") ||
-    $("#id_include_active_employees").is(":checked")
+    $("#id_is_condition_based").is(":checked") &&
+    !$("#id_include_active_employees").is(":checked")
   ) {
     $("#id_exclude_employees, [for=id_exclude_employees]").show();
     $("#id_exclude_employees, [for=id_exclude_employees]").parent().show();
@@ -177,7 +217,7 @@ function conditionalVisibility() {
     $("#id_exclude_employees, [for=id_exclude_employees]").hide();
     $("#id_exclude_employees, [for=id_exclude_employees]").parent().hide();
   }
-  if ($("#id_is_condition_based, #id_include_active_employees").is(":checked")) {
+  if ($("#id_is_condition_based").is(":checked")) {
     $("#id_specific_employees").parent().find("ul.select2-selection__rendered li").remove()
     $("#id_specific_employees").val(null)
     $("#id_specific_employees,[for=id_specific_employees]").hide();
@@ -236,6 +276,98 @@ $(document).ready(function () {
   // Adding add more mutton on the condition based check box
   $('[name="is_condition_based"]').parent().after(addMore);
 
+  // Listen for changes on specific_employees to sync the dropdown options
+  $('#id_specific_employees').on('change', function() {
+    if ($("#id_include_active_employees").is(":checked")) {
+      // Get currently selected values
+      var selectedValues = $(this).val() || [];
+      
+      // Update the options to only show selected employees
+      // This removes unselected ones from the dropdown
+      var currentOptions = [];
+      $(this).find('option').each(function() {
+        if (selectedValues.includes($(this).val())) {
+          currentOptions.push({
+            id: $(this).val(),
+            text: $(this).text()
+          });
+        }
+      });
+      
+      // Rebuild the select with only selected options
+      $(this).empty();
+      currentOptions.forEach(function(opt) {
+        var option = new Option(opt.text, opt.id, true, true);
+        $('#id_specific_employees').append(option);
+      });
+      
+      // Trigger change to update Select2 display
+      $(this).trigger('change.select2');
+      
+      // Remove title attributes from the selected items to prevent tooltips
+      setTimeout(function() {
+        $('#selectContainerid_specific_employees .select2-selection__choice').removeAttr('title');
+      }, 100);
+    }
+  });
+  
+  // Also remove tooltips on initial load when include all is checked
+  setTimeout(function() {
+    if ($("#id_include_active_employees").is(":checked")) {
+      $('#selectContainerid_specific_employees .select2-selection__choice').removeAttr('title');
+    }
+  }, 500);
+
+  // Add custom CSS for specific_employees select2
+  $('<style>')
+    .prop('type', 'text/css')
+    .html(`
+      /* Increase height of the selected items box to show more names */
+      #selectContainerid_specific_employees .select2-container .select2-selection {
+        max-height: 300px !important;
+        overflow-y: auto !important;
+        padding: 5px !important;
+      }
+      
+      /* Position the dropdown to the RIGHT side of the field */
+      .select2-container--open .select2-dropdown--below {
+        position: absolute !important;
+        left: 100% !important;
+        top: 0 !important;
+        margin-left: 10px !important;
+      }
+      
+      /* Make dropdown scrollable with reasonable height */
+      .select2-results {
+        max-height: 300px !important;
+        overflow-y: auto !important;
+      }
+      
+      /* Position the selection choice tooltips to the right */
+      #selectContainerid_specific_employees .select2-selection__choice {
+        position: relative !important;
+      }
+      
+      #selectContainerid_specific_employees .select2-selection__choice__display {
+        position: relative !important;
+      }
+      
+      /* Move any tooltips/titles to the right side */
+      #selectContainerid_specific_employees .select2-selection__choice[title]:hover::after {
+        content: attr(title) !important;
+        position: absolute !important;
+        left: 100% !important;
+        top: 0 !important;
+        margin-left: 10px !important;
+        background: #333 !important;
+        color: white !important;
+        padding: 5px 10px !important;
+        border-radius: 4px !important;
+        white-space: nowrap !important;
+        z-index: 9999 !important;
+      }
+    `)
+    .appendTo('head');
 
 });
 

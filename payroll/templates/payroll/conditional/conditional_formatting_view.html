@@ -1,0 +1,57 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block content %}
+<section class="oh-wrapper oh-main__topbar">
+    <div class="oh-main__titlebar oh-main__titlebar--left">
+        <h1 class="oh-main__titlebar-title fw-bold">{% trans "Conditional Formatting" %}</h1>
+    </div>
+    <div class="oh-main__titlebar oh-main__titlebar--right">
+        <div class="oh-main__titlebar-button-container">
+            {% if perms.payroll.add_conditionalformatting %}
+            <div class="oh-btn-group">
+                <div>
+                    <button
+                        class="oh-btn oh-btn--secondary oh-btn--shadow"
+                        data-target="#objectCreateModal"
+                        data-toggle="oh-modal-toggle"
+                        hx-get="{% url 'create-conditional-formatting' %}"
+                        hx-target="#objectCreateModalTarget"
+                    >
+                        <ion-icon name="add-outline"></ion-icon>
+                        {% trans "Create Rule" %}
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<div class="oh-wrapper">
+    <div class="oh-main__card-container" id="FilingStatusList">
+        {% include 'payroll/conditional/conditional_formatting_list.html' %}
+    </div>
+</div>
+
+<div class="oh-modal" id="objectCreateModal" role="dialog" aria-labelledby="objectCreateModal" aria-hidden="true">
+    <div class="oh-modal__dialog oh-modal__dialog--large" id="objectCreateModalTarget"></div>
+</div>
+
+<style>
+    @media (max-width: 768px) {
+        .oh-modal__dialog--large {
+            max-width: 95% !important;
+            margin: 1rem;
+        }
+    }
+    
+    @media (min-width: 769px) {
+        .oh-modal__dialog--large {
+            max-width: 90%;
+        }
+    }
+</style>
+
+{% endblock content %}

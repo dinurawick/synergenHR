@@ -199,9 +199,10 @@ class ConfiguredEmailBackend(BACKEND_CLASS):
     def send_messages(self, email_messages):
         response = super(BACKEND_CLASS, self).send_messages(email_messages)
         for message in email_messages:
+            from_email = self.dynamic_from_email_with_display_name or getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
             email_log = EmailLog(
                 subject=message.subject,
-                from_email=self.dynamic_from_email_with_display_name,
+                from_email=from_email,
                 to=message.to,
                 body=message.body,
                 status="sent" if response else "failed",
