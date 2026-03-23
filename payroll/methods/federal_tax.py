@@ -94,8 +94,4 @@ def formated_result(brackets: dict, taxable_amount: float) -> None:
     print(f"|             YEARLY TAXABLE INCOME    | {taxable_amount}    |")
     print("----------------------------------------------------")
 
-
-month_taxable = calculate_federal_tax(YEARLY_TAXABLE_INCOME)
-print("YEARLY TAXABLE AMOUNT", month_taxable)
-
 '''

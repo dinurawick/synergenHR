@@ -9,7 +9,6 @@ class Chat {
   // Events
   events() {
     // Dashboard Event Slider
-    console.log(this.sideBarBtn);
     this.sideBarBtn.on(
       "click",
       this.toggleSidebar.bind(this)

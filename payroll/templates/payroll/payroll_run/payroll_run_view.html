@@ -1,0 +1,487 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header">
+    <span class="oh-modal__dialog-title">
+        <h5>{{ payroll_run.run_name }}</h5>
+    </span>
+    <button type="button" class="oh-modal__close" data-dismiss="oh-modal" aria-label="Close"
+        data-toggle="oh-modal-toggle">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+<div class="oh-modal__dialog-body payroll-run-view">
+    <!-- Header Info -->
+    <div class="run-header">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Run Code" %}</label>
+                    <p class="info-value"><strong>{{ payroll_run.run_code }}</strong></p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Status" %}</label>
+                    <p class="info-value">
+                        {% if payroll_run.status == 'draft' %}
+                        <span class="oh-badge oh-badge--secondary">{{ payroll_run.get_status_display }}</span>
+                        {% elif payroll_run.status == 'processing' %}
+                        <span class="oh-badge oh-badge--warning">{{ payroll_run.get_status_display }}</span>
+                        {% elif payroll_run.status == 'review' %}
+                        <span class="oh-badge oh-badge--info">{{ payroll_run.get_status_display }}</span>
+                        {% elif payroll_run.status == 'approved' %}
+                        <span class="oh-badge oh-badge--primary">{{ payroll_run.get_status_display }}</span>
+                        {% elif payroll_run.status == 'paid' %}
+                        <span class="oh-badge oh-badge--success">{{ payroll_run.get_status_display }}</span>
+                        {% elif payroll_run.status == 'cancelled' %}
+                        <span class="oh-badge oh-badge--danger">{{ payroll_run.get_status_display }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="info-group">
+                    <label>{% trans "Run Type" %}</label>
+                    <p class="info-value">
+                        <span class="oh-badge oh-badge--info">{{ payroll_run.get_run_type_display }}</span>
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="info-group">
+                    <label>{% trans "Frequency" %}</label>
+                    <p class="info-value">{{ payroll_run.get_frequency_display }}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="info-group">
+                    <label>{% trans "Payment Date" %}</label>
+                    <p class="info-value">{{ payroll_run.payment_date|date:"M d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Period Start" %}</label>
+                    <p class="info-value">{{ payroll_run.period_start|date:"M d, Y" }}</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Period End" %}</label>
+                    <p class="info-value">{{ payroll_run.period_end|date:"M d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Totals -->
+    <div class="run-totals mt-4">
+        <h6 class="section-title">{% trans "Summary" %}</h6>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="total-card">
+                    <label>{% trans "Total Employees" %}</label>
+                    <p class="total-value">{{ payroll_run.total_employees }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="total-card">
+                    <label>{% trans "Total Gross" %}</label>
+                    <p class="total-value">{{ payroll_run.total_gross|floatformat:2 }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="total-card">
+                    <label>{% trans "Total Deductions" %}</label>
+                    <p class="total-value">{{ payroll_run.total_deductions|floatformat:2 }}</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="total-card total-card--highlight">
+                    <label>{% trans "Total Net" %}</label>
+                    <p class="total-value">{{ payroll_run.total_net|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Description & Notes -->
+    {% if payroll_run.description or payroll_run.notes %}
+    <div class="run-details mt-4">
+        {% if payroll_run.description %}
+        <div class="info-group">
+            <label>{% trans "Description" %}</label>
+            <p class="info-value">{{ payroll_run.description }}</p>
+        </div>
+        {% endif %}
+        
+        {% if payroll_run.notes %}
+        <div class="info-group mt-3">
+            <label>{% trans "Notes" %}</label>
+            <p class="info-value">{{ payroll_run.notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Metadata -->
+    <div class="run-metadata mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Created By" %}</label>
+                    <p class="info-value">{{ payroll_run.run_created_by.get_full_name }}</p>
+                </div>
+            </div>
+            {% if payroll_run.approved_by %}
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Approved By" %}</label>
+                    <p class="info-value">{{ payroll_run.approved_by.get_full_name }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Created At" %}</label>
+                    <p class="info-value">{{ payroll_run.created_at|date:"M d, Y H:i" }}</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="info-group">
+                    <label>{% trans "Last Updated" %}</label>
+                    <p class="info-value">{{ payroll_run.updated_at|date:"M d, Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Payslips -->
+    <div class="run-payslips mt-4" id="payslipsSection">
+        <div class="payslips-header">
+            <h6 class="section-title">{% trans "Payslips" %} ({{ payslips.count }})</h6>
+            <div class="payslips-actions">
+                {% if payroll_run.status == 'draft' or payroll_run.status == 'processing' or payroll_run.status == 'review' %}
+                <div class="status-info">
+                    <small class="text-muted">
+                        <ion-icon name="information-circle-outline"></ion-icon>
+                        {% trans "Payslips will be auto-generated when status is set to 'Approved'" %}
+                    </small>
+                </div>
+                {% endif %}
+                {% if perms.payroll.add_payslip and payroll_run.status not in 'paid,cancelled' %}
+                <button
+                    class="oh-btn oh-btn--secondary oh-btn--sm"
+                    data-target="#payslipCreateModal"
+                    data-toggle="oh-modal-toggle"
+                    hx-get="{% url 'create-payslip' %}?payroll_run_id={{ payroll_run.id }}"
+                    hx-target="#payslipCreateModalTarget"
+                    title="{% trans 'Create Additional Payslip for this Payroll Run' %}"
+                >
+                    <ion-icon name="add-outline"></ion-icon>
+                    {% trans "Create Payslip" %}
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if payslips %}
+        <div class="payslips-list">
+            {% for payslip in payslips %}
+            <div class="payslip-item">
+                <span class="payslip-employee">{{ payslip.employee_id.get_full_name }}</span>
+                <span class="payslip-status">
+                    {% if payslip.status == 'draft' %}
+                    <span class="oh-badge oh-badge--secondary">{{ payslip.get_status_display }}</span>
+                    {% elif payslip.status == 'review_ongoing' %}
+                    <span class="oh-badge oh-badge--warning">{{ payslip.get_status_display }}</span>
+                    {% elif payslip.status == 'confirmed' %}
+                    <span class="oh-badge oh-badge--primary">{{ payslip.get_status_display }}</span>
+                    {% elif payslip.status == 'paid' %}
+                    <span class="oh-badge oh-badge--success">{{ payslip.get_status_display }}</span>
+                    {% endif %}
+                </span>
+                <span class="payslip-amount">{{ payslip.net_pay|floatformat:2 }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-payslips">
+            {% if payroll_run.status == 'draft' or payroll_run.status == 'processing' or payroll_run.status == 'review' %}
+            <p>{% trans "No payslips generated yet." %}</p>
+            <p class="text-muted">{% trans "Payslips will be automatically generated when this payroll run is approved." %}</p>
+            {% else %}
+            <p>{% trans "No payslips created yet for this payroll run." %}</p>
+            {% if perms.payroll.add_payslip and payroll_run.status not in 'paid,cancelled' %}
+            <p class="text-muted">{% trans "Click 'Create Payslip' above to add payslips for employees in this run." %}</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Actions -->
+    <div class="oh-modal__dialog-footer">
+        {% if perms.payroll.change_payrollrun and payroll_run.status not in 'paid,cancelled' %}
+        <button
+            class="oh-btn oh-btn--light-bkg"
+            data-target="#objectCreateModal"
+            data-toggle="oh-modal-toggle"
+            hx-get="{% url 'update-payroll-run' payroll_run.id %}"
+            hx-target="#objectCreateModalTarget"
+        >
+            <ion-icon name="create-outline"></ion-icon>
+            {% trans "Edit" %}
+        </button>
+        {% endif %}
+        
+        {% if perms.payroll.change_payrollrun and payroll_run.status != 'paid' %}
+        <form hx-post="{% url 'update-payroll-run-status' payroll_run.id %}" hx-target="#objectCreateModalTarget" style="display: inline;">
+            {% csrf_token %}
+            <select name="status" class="oh-input" style="display: inline-block; width: auto; margin-right: 0.5rem;">
+                <option value="">{% trans "Change Status..." %}</option>
+                {% for value, label in payroll_run.STATUS_CHOICES %}
+                <option value="{{ value }}" {% if value == payroll_run.status %}disabled{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="oh-btn oh-btn--secondary">
+                {% trans "Update Status" %}
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Payslip Creation Modal -->
+<div class="oh-modal" id="payslipCreateModal" role="dialog" aria-labelledby="payslipCreateModal" aria-hidden="true">
+    <div class="oh-modal__dialog oh-modal__dialog--medium" id="payslipCreateModalTarget"></div>
+</div>
+
+<style>
+    .payroll-run-view {
+        padding: 1.5rem;
+    }
+    
+    .run-header {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .info-group {
+        margin-bottom: 0;
+    }
+    
+    .info-group label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+    }
+    
+    .info-value {
+        font-size: 0.875rem;
+        color: #111827;
+        margin: 0;
+    }
+    
+    .section-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .run-totals {
+        padding: 1.5rem;
+        background: #f9fafb;
+        border-radius: 0.5rem;
+    }
+    
+    .total-card {
+        text-align: center;
+        padding: 1rem;
+        background: #fff;
+        border-radius: 0.375rem;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .total-card--highlight {
+        background: #1e3a8a;
+        color: #fff;
+        border-color: #1e3a8a;
+    }
+    
+    .total-card--highlight label,
+    .total-card--highlight .total-value {
+        color: #fff;
+    }
+    
+    .total-card label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+    }
+    
+    .total-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #111827;
+        margin: 0;
+    }
+    
+    .oh-badge {
+        display: inline-block;
+        padding: 0.375rem 0.875rem;
+        border-radius: 0.375rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.5;
+    }
+    
+    .oh-badge--info {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .oh-badge--success {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .oh-badge--secondary {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .oh-badge--primary {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .oh-badge--warning {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .oh-badge--danger {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .payslips-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .payslips-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        gap: 1rem;
+    }
+    
+    .payslips-header .section-title {
+        margin-bottom: 0;
+        border-bottom: none;
+        padding-bottom: 0;
+        flex-shrink: 0;
+    }
+    
+    .payslips-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .status-info {
+        text-align: right;
+    }
+    
+    .status-info small {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    .status-info ion-icon {
+        font-size: 0.875rem;
+    }
+    
+    .payslip-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.875rem;
+        gap: 1rem;
+    }
+    
+    .payslip-item:last-child {
+        border-bottom: none;
+    }
+    
+    .payslip-employee {
+        color: #374151;
+        flex: 1;
+    }
+    
+    .payslip-status {
+        flex-shrink: 0;
+    }
+    
+    .payslip-amount {
+        font-weight: 600;
+        color: #111827;
+        flex-shrink: 0;
+        min-width: 80px;
+        text-align: right;
+    }
+    
+    .empty-payslips {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+        background: #f9fafb;
+        border-radius: 0.375rem;
+        border: 1px dashed #d1d5db;
+    }
+    
+    .empty-payslips p {
+        margin: 0.5rem 0;
+    }
+    
+    .text-muted {
+        font-size: 0.8125rem;
+        color: #9ca3af;
+    }
+    
+    .oh-modal__dialog-footer {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+</style>

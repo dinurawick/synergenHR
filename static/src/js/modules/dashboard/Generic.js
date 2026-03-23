@@ -130,7 +130,6 @@ class Generic {
         var selectedText = e.params.data.text;
         var tags = selectedText.split(/[, ]+/);
         var ajaxMethod = $(this).attr("data-ajax-name");
-        console.log(ajaxMethod);
         let optionElement = $(this).find(`option[value=${tags[0]}]`);
         if (ajaxMethod) {
           window[ajaxMethod](optionElement);

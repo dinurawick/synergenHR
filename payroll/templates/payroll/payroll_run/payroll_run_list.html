@@ -1,0 +1,331 @@
+{% load i18n %}
+{% load static %}
+
+<div class="oh-main__card payroll-run-list">
+    <div class="oh-main__card-body">
+        <!-- Filters -->
+        <div class="oh-filters-container mb-3">
+            <form method="get" class="oh-filters-form">
+                <div class="row">
+                    <div class="col-md-3">
+                        {{ filter_form.run_type }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ filter_form.status }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ filter_form.frequency }}
+                    </div>
+                    <div class="col-md-3">
+                        <input 
+                            type="text" 
+                            name="search" 
+                            class="oh-input w-100" 
+                            placeholder="{% trans 'Search by name or code...' %}"
+                            value="{{ request.GET.search }}"
+                        />
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <button type="submit" class="oh-btn oh-btn--secondary oh-btn--sm">
+                            <ion-icon name="filter-outline"></ion-icon>
+                            {% trans "Apply Filters" %}
+                        </button>
+                        <a href="{% url 'payroll-run-list' %}" class="oh-btn oh-btn--light-bkg oh-btn--sm">
+                            <ion-icon name="close-outline"></ion-icon>
+                            {% trans "Clear" %}
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {% if runs %}
+        <div class="oh-table-container">
+            <table class="oh-table oh-table--responsive">
+                <thead>
+                    <tr>
+                        <th>{% trans "Run Code" %}</th>
+                        <th>{% trans "Run Name" %}</th>
+                        <th>{% trans "Type" %}</th>
+                        <th>{% trans "Period" %}</th>
+                        <th>{% trans "Payment Date" %}</th>
+                        <th>{% trans "Status" %}</th>
+                        <th>{% trans "Employees" %}</th>
+                        <th>{% trans "Total Net" %}</th>
+                        <th class="oh-table__actions-column">{% trans "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs %}
+                    <tr>
+                        <td data-label="{% trans 'Run Code' %}">
+                            <strong>{{ run.run_code }}</strong>
+                        </td>
+                        <td data-label="{% trans 'Run Name' %}">
+                            {{ run.run_name }}
+                        </td>
+                        <td data-label="{% trans 'Type' %}">
+                            <span class="oh-badge oh-badge--info">
+                                {{ run.get_run_type_display }}
+                            </span>
+                        </td>
+                        <td data-label="{% trans 'Period' %}">
+                            {{ run.period_start|date:"M d, Y" }} - {{ run.period_end|date:"M d, Y" }}
+                        </td>
+                        <td data-label="{% trans 'Payment Date' %}">
+                            {{ run.payment_date|date:"M d, Y" }}
+                        </td>
+                        <td data-label="{% trans 'Status' %}">
+                            {% if run.status == 'draft' %}
+                            <span class="oh-badge oh-badge--secondary">{{ run.get_status_display }}</span>
+                            {% elif run.status == 'processing' %}
+                            <span class="oh-badge oh-badge--warning">{{ run.get_status_display }}</span>
+                            {% elif run.status == 'review' %}
+                            <span class="oh-badge oh-badge--info">{{ run.get_status_display }}</span>
+                            {% elif run.status == 'approved' %}
+                            <span class="oh-badge oh-badge--primary">{{ run.get_status_display }}</span>
+                            {% elif run.status == 'paid' %}
+                            <span class="oh-badge oh-badge--success">{{ run.get_status_display }}</span>
+                            {% elif run.status == 'cancelled' %}
+                            <span class="oh-badge oh-badge--danger">{{ run.get_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="{% trans 'Employees' %}">
+                            {{ run.total_employees }}
+                        </td>
+                        <td data-label="{% trans 'Total Net' %}">
+                            {{ run.total_net|floatformat:2 }}
+                        </td>
+                        <td data-label="{% trans 'Actions' %}" class="oh-table__actions-column">
+                            <div class="oh-btn-group oh-btn-group--compact">
+                                {% if perms.payroll.view_payrollrun %}
+                                <button
+                                    class="oh-btn oh-btn--light-bkg oh-btn--sm"
+                                    data-target="#objectCreateModal"
+                                    data-toggle="oh-modal-toggle"
+                                    hx-get="{% url 'view-payroll-run' run.id %}"
+                                    hx-target="#objectCreateModalTarget"
+                                    title="{% trans 'View Details' %}"
+                                >
+                                    <ion-icon name="eye-outline"></ion-icon>
+                                </button>
+                                {% endif %}
+                                {% if perms.payroll.change_payrollrun and run.status not in 'paid,cancelled' %}
+                                <button
+                                    class="oh-btn oh-btn--light-bkg oh-btn--sm"
+                                    data-target="#objectCreateModal"
+                                    data-toggle="oh-modal-toggle"
+                                    hx-get="{% url 'update-payroll-run' run.id %}"
+                                    hx-target="#objectCreateModalTarget"
+                                    title="{% trans 'Edit' %}"
+                                >
+                                    <ion-icon name="create-outline"></ion-icon>
+                                </button>
+                                {% endif %}
+                                {% if perms.payroll.delete_payrollrun and run.status != 'paid' %}
+                                <button
+                                    class="oh-btn oh-btn--light-bkg oh-btn--sm"
+                                    hx-delete="{% url 'delete-payroll-run' run.id %}"
+                                    hx-target="#PayrollRunList"
+                                    hx-confirm="{% trans 'Are you sure you want to delete this payroll run?' %}"
+                                    title="{% trans 'Delete' %}"
+                                >
+                                    <ion-icon name="trash-outline"></ion-icon>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="oh-empty-state">
+            <div class="oh-empty-state__content">
+                <img src="{% static 'images/ui/empty.svg' %}" alt="{% trans 'No payroll runs' %}" class="oh-empty-state__image" />
+                <h3 class="oh-empty-state__title">{% trans "No payroll runs found" %}</h3>
+                <p class="oh-empty-state__description">{% trans "Create your first payroll run to get started" %}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .payroll-run-list .oh-main__card-body {
+        padding: 0;
+    }
+    
+    .oh-filters-container {
+        background: #f9fafb;
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .oh-filters-form select,
+    .oh-filters-form input {
+        padding: 0.625rem 0.875rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        width: 100%;
+    }
+    
+    .payroll-run-list .oh-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    
+    .payroll-run-list .oh-table thead th {
+        padding: 0.875rem 1rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #6b7280;
+        background-color: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .payroll-run-list .oh-table thead th:first-child {
+        border-top-left-radius: 0.5rem;
+    }
+    
+    .payroll-run-list .oh-table thead th:last-child {
+        border-top-right-radius: 0.5rem;
+    }
+    
+    .payroll-run-list .oh-table tbody td {
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.875rem;
+        color: #374151;
+    }
+    
+    .payroll-run-list .oh-table tbody tr:hover {
+        background-color: #f9fafb;
+    }
+    
+    .payroll-run-list .oh-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .payroll-run-list .oh-badge {
+        display: inline-block;
+        padding: 0.375rem 0.875rem;
+        border-radius: 0.375rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.5;
+    }
+    
+    .payroll-run-list .oh-badge--info {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .payroll-run-list .oh-badge--success {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .payroll-run-list .oh-badge--secondary {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .payroll-run-list .oh-badge--primary {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .payroll-run-list .oh-badge--warning {
+        background-color: #1e3a8a;
+        color: #ffffff;
+    }
+    
+    .payroll-run-list .oh-badge--danger {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .payroll-run-list .oh-btn-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .payroll-run-list .oh-btn--sm {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.875rem;
+    }
+    
+    .payroll-run-list .oh-table__actions-column {
+        text-align: right;
+        width: 150px;
+    }
+    
+    @media (max-width: 768px) {
+        .oh-table--responsive thead {
+            display: none;
+        }
+        
+        .oh-table--responsive tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background-color: #fff;
+        }
+        
+        .oh-table--responsive tbody td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border: none;
+        }
+        
+        .oh-table--responsive tbody td:before {
+            content: attr(data-label);
+            font-weight: 600;
+            margin-right: 1rem;
+            color: #6b7280;
+        }
+        
+        .oh-table__actions-column {
+            justify-content: flex-end !important;
+        }
+        
+        .oh-btn-group--compact {
+            gap: 0.5rem;
+        }
+    }
+    
+    .oh-empty-state {
+        text-align: center;
+        padding: 3rem 1.5rem;
+    }
+    
+    .oh-empty-state__image {
+        width: 200px;
+        height: auto;
+        margin-bottom: 1.5rem;
+        opacity: 0.6;
+    }
+    
+    .oh-empty-state__title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+    }
+    
+    .oh-empty-state__description {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+</style>

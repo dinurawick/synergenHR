@@ -678,34 +678,6 @@ if apps.is_installed("leave"):
         #             ).delete()
 
 
-# class OverrideWorkInfo(EmployeeWorkInformation):
-#     """
-#     This class is to override the Model default methods
-#     """
-
-# @receiver(pre_save, sender=EmployeeWorkInformation)
-# def employeeworkinformation_pre_save(sender, instance, **_kwargs):
-#     """
-#     This method is used to override the save method for EmployeeWorkInformation Model
-#     """
-#     active_employee = (
-#         instance.employee_id if instance.employee_id.is_active == True else None
-#     )
-#     if active_employee is not None:
-#         contract_exists = active_employee.contract_set.exists()
-#         if not contract_exists:
-#             contract = Contract()
-#             contract.contract_name = f"{active_employee}'s Contract"
-#             contract.employee_id = active_employee
-#             contract.contract_start_date = (
-#                 instance.date_joining if instance.date_joining else datetime.today()
-#             )
-#             contract.wage = (
-#                 instance.basic_salary if instance.basic_salary is not None else 0
-#             )
-#             contract.save()
-
-
 # Create your models here.
 def rate_validator(value):
     """
@@ -1428,6 +1400,202 @@ class Deduction(HorillaModel):
         super().save()
 
 
+class PayrollRun(HorillaModel):
+    """
+    PayrollRun model - Represents a single payroll processing run
+    """
+
+    RUN_TYPE_CHOICES = [
+        ("regular", _("Regular Salary")),
+        ("advance", _("Advance Payment")),
+        ("bonus", _("Bonus/Incentive")),
+        ("correction", _("Correction/Adjustment")),
+    ]
+
+    FREQUENCY_CHOICES = [
+        ("weekly", _("Weekly")),
+        ("bi_weekly", _("Bi-Weekly")),
+        ("semi_monthly", _("Semi-Monthly")),
+        ("monthly", _("Monthly")),
+        ("quarterly", _("Quarterly")),
+        ("annual", _("Annual")),
+        ("adhoc", _("Ad-hoc")),
+    ]
+
+    STATUS_CHOICES = [
+        ("draft", _("Draft")),
+        ("processing", _("Processing")),
+        ("review", _("Under Review")),
+        ("approved", _("Approved")),
+        ("paid", _("Paid")),
+        ("cancelled", _("Cancelled")),
+    ]
+
+    # Identification
+    run_name = models.CharField(
+        max_length=255,
+        verbose_name=_("Run Name"),
+        help_text=_("Name for this payroll run (e.g., 'February 2024 - Regular')"),
+    )
+    run_code = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name=_("Run Code"),
+        help_text=_("Unique code for this run (auto-generated)"),
+    )
+    run_type = models.CharField(
+        max_length=20,
+        choices=RUN_TYPE_CHOICES,
+        default="regular",
+        verbose_name=_("Run Type"),
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=FREQUENCY_CHOICES,
+        default="monthly",
+        verbose_name=_("Frequency"),
+    )
+
+    # Period
+    period_start = models.DateField(verbose_name=_("Period Start Date"))
+    period_end = models.DateField(verbose_name=_("Period End Date"))
+    payment_date = models.DateField(
+        verbose_name=_("Payment Date"),
+        help_text=_("Date when payment will be made"),
+    )
+
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="draft",
+        verbose_name=_("Status"),
+    )
+
+    # Relationships
+    company_id = models.ForeignKey(
+        Company,
+        on_delete=models.PROTECT,
+        null=True,
+        editable=False,
+        verbose_name=_("Company"),
+    )
+    run_created_by = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name="created_payroll_runs",
+        verbose_name=_("Run Created By"),
+    )
+    approved_by = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_payroll_runs",
+        verbose_name=_("Approved By"),
+    )
+
+    # Aggregates (calculated from payslips)
+    total_employees = models.IntegerField(
+        default=0, verbose_name=_("Total Employees")
+    )
+    total_gross = models.FloatField(default=0, verbose_name=_("Total Gross Pay"))
+    total_deductions = models.FloatField(default=0, verbose_name=_("Total Deductions"))
+    total_net = models.FloatField(default=0, verbose_name=_("Total Net Pay"))
+
+    # Metadata
+    description = models.TextField(
+        blank=True, verbose_name=_("Description"), max_length=500
+    )
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+
+    # Timestamps (created_at inherited from HorillaModel, just add updated_at)
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Updated At"))
+
+    objects = HorillaCompanyManager()
+
+    class Meta:
+        ordering = ["-payment_date", "-created_at"]
+        verbose_name = _("Payroll Run")
+        verbose_name_plural = _("Payroll Runs")
+
+    def __str__(self):
+        return f"{self.run_name} ({self.get_status_display()})"
+
+    def clean(self):
+        super().clean()
+        if self.period_end < self.period_start:
+            raise ValidationError(
+                {
+                    "period_end": _(
+                        "Period end date must be greater than or equal to period start date"
+                    )
+                }
+            )
+        if self.payment_date < self.period_end:
+            raise ValidationError(
+                {
+                    "payment_date": _(
+                        "Payment date should be on or after the period end date"
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        # Auto-generate run_code if not set
+        if not self.run_code:
+            self.run_code = self.generate_run_code()
+
+        # Set company from session if not set
+        if not self.id:
+            request = getattr(horilla_middlewares._thread_locals, "request", None)
+            if request:
+                selected_company = request.session.get("selected_company")
+                if selected_company and selected_company != "all":
+                    self.company_id = Company.find(selected_company)
+
+        super().save(*args, **kwargs)
+
+    def generate_run_code(self):
+        """
+        Generate a unique run code in format: YYYY-MM-TYPE-###
+        Example: 2024-02-REG-001
+        """
+        year = self.period_start.year
+        month = self.period_start.month
+        type_code = self.run_type[:3].upper()
+
+        # Find the next sequence number for this year-month-type combination
+        prefix = f"{year}-{month:02d}-{type_code}-"
+        existing_runs = PayrollRun.objects.filter(run_code__startswith=prefix)
+
+        if existing_runs.exists():
+            # Extract sequence numbers and find the max
+            sequence_numbers = []
+            for run in existing_runs:
+                try:
+                    seq = int(run.run_code.split("-")[-1])
+                    sequence_numbers.append(seq)
+                except (ValueError, IndexError):
+                    continue
+            next_seq = max(sequence_numbers) + 1 if sequence_numbers else 1
+        else:
+            next_seq = 1
+
+        return f"{prefix}{next_seq:03d}"
+
+    def update_totals(self):
+        """
+        Update aggregate totals from related payslips
+        """
+        payslips = self.payslips.all()
+        self.total_employees = payslips.count()
+        self.total_gross = sum(p.gross_pay or 0 for p in payslips)
+        self.total_deductions = sum(p.deduction or 0 for p in payslips)
+        self.total_net = sum(p.net_pay or 0 for p in payslips)
+        self.save()
+
+
 class Payslip(HorillaModel):
     """
     Payslip model
@@ -1439,6 +1607,18 @@ class Payslip(HorillaModel):
         ("confirmed", _("Confirmed")),
         ("paid", _("Paid")),
     ]
+    
+    # Link to PayrollRun (nullable for backward compatibility)
+    payroll_run = models.ForeignKey(
+        PayrollRun,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payslips",
+        verbose_name=_("Payroll Run"),
+        help_text=_("The payroll run this payslip belongs to"),
+    )
+    
     group_name = models.CharField(
         max_length=50, null=True, blank=True, verbose_name=_("Batch name")
     )

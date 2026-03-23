@@ -71,7 +71,6 @@ $('.stage').mouseup(function () {
         'newSequences':JSON.stringify(newSequences),
       },
       success: function (response) {
-        // console.log(response);
       }
     });
   }
@@ -132,7 +131,6 @@ $('.schedule').change(function (e) {
       'date':date
     },
     success: function (response) {
-      console.log(response);
     }
   });
 

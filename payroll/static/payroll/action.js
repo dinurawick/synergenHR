@@ -389,8 +389,6 @@ $("#deletePayslipBulk").click(function (e) {
             success: function (response, textStatus, jqXHR) {
               if (jqXHR.status === 200) {
                 location.reload(); // Reload the current page
-              } else {
-                // console.log("Unexpected HTTP status:", jqXHR.status);
               }
             },
           });
@@ -502,9 +500,6 @@ function selectAllContracts() {
           JSON.stringify(
             Array.from(new Set([...contractIds, ...JSON.parse(previousIds)]))
           )
-        );
-        console.log(
-          Array.from(new Set([...contractIds, ...JSON.parse(previousIds)]))
         );
 
         count = makeEmpListUnique(contractIds);
@@ -679,8 +674,6 @@ $("#DeleteContractBulk").click(function (e) {
             success: function (response, textStatus, jqXHR) {
               if (jqXHR.status === 200) {
                 location.reload(); // Reload the current page
-              } else {
-                // console.log("Unexpected HTTP status:", jqXHR.status);
               }
             },
           });

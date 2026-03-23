@@ -122,7 +122,7 @@ $(document).ready(function () {
         });
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   }
@@ -182,7 +182,7 @@ $(document).ready(function () {
         }
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   };
@@ -204,7 +204,7 @@ $(document).ready(function () {
         $(".payslip-amount").html(response.total_amount);
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   }
@@ -310,7 +310,7 @@ $(document).ready(function () {
         }
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   }
@@ -406,7 +406,7 @@ $(document).ready(function () {
         }
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   }
@@ -478,7 +478,7 @@ $(document).ready(function () {
         }
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   }
@@ -525,7 +525,7 @@ $(document).ready(function () {
         }
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   });
@@ -563,7 +563,7 @@ $(document).ready(function () {
         }
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   });
@@ -589,7 +589,7 @@ $(document).ready(function () {
         $("#contract_target").html(response);
       },
       error: (error) => {
-        console.log("Error", error);
+        // Handle error silently
       },
     });
   });

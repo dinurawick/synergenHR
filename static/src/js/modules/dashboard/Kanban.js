@@ -415,7 +415,6 @@ class Kanban {
    * Kanban Card Form
    */
   showKanbanCardForm(e) {
-    console.log('Hello');
     const clickedEl = $(e.target).closest(".oh-kanban__add-card-btn");
     if (clickedEl.length > 0) {
       clickedEl
