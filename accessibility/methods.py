@@ -24,7 +24,9 @@ def check_is_accessible(feature, cache_key, employee):
     if accessibility and accessibility.exclude_all:
         return False
     if not feature or not accessibility:
-        return True
+        # No accessibility record configured — do not grant access via this path.
+        # Permission checks (has_perm) are the authoritative gate.
+        return False
 
     data: dict = cache.get(cache_key, default={})
     if data and data.get(feature) is not None:

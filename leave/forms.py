@@ -144,6 +144,7 @@ class LeaveTypeForm(ConditionForm):
                 "class": "oh-select oh-select-2 w-100",
                 "style": "background-color: white !important; color: black !important;"
             }),
+            "monthly_recurring": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
         }
 
     def clean(self):
@@ -330,6 +331,7 @@ class UpdateLeaveTypeForm(ConditionForm):
             'carryforward_expire_in', 'carryforward_expire_period', 'carryforward_expire_date',
             'require_approval', 'require_attachment', 'exclude_company_leave',
             'exclude_holiday', 'exclude_weekends', 'is_compensatory_leave',
+            'monthly_recurring',
             'use_conditional_formatting', 'conditional_formatting_rule', 'gender_restriction', 'company_id'
         ]
         widgets = {
@@ -397,7 +399,7 @@ class LeaveRequestCreationForm(BaseModelForm):
         )
         
         # Filter cover employees to same department
-        if self.instance and self.instance.employee_id:
+        if self.instance and self.instance.employee_id_id:
             employee = self.instance.employee_id
             if hasattr(employee, 'employee_work_info') and employee.employee_work_info.department_id:
                 department = employee.employee_work_info.department_id

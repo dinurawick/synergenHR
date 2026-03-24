@@ -306,6 +306,21 @@
                         </div>
                     </div>
                     
+                    <!-- Monthly Recurring -->
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info  justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <label for="id_monthly_recurring" class="oh-label">{{ form.monthly_recurring.label }}</label>
+                                <span class=" oh-info me-3"
+                                    title="{% trans 'If enabled, employees with this leave type will automatically receive the allocated leave days every month.' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3 ">
+                                {{form.monthly_recurring}}
+                                {{form.monthly_recurring.errors}}
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Conditional Formatting Fields -->
                     <div class="col-sm-12 col-md-12 col-lg-6">
                         <div class="oh-input-group oh-label__info  justify-content-between">

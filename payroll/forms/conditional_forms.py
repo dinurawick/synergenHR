@@ -44,10 +44,16 @@ class ConditionalFormattingForm(ModelForm):
         if self.instance.pk is None:
             self.instance.python_code = self.get_default_code()
         else:
-            # When editing, remove these fields to prevent changes
-            del self.fields["use_python_code"]
-            del self.fields["python_code"]
-            del self.fields["module_type"]
+            # When editing, make module_type read-only but keep python_code editable
+            self.fields["module_type"].widget.attrs['readonly'] = True
+            self.fields["module_type"].help_text = _("Module type cannot be changed after creation")
+            
+            # If this instance uses Python code, ensure the checkbox is checked and editor is visible
+            if self.instance.use_python_code:
+                self.fields["use_python_code"].initial = True
+                self.fields["use_python_code"].widget.attrs['checked'] = True
+                # Add JavaScript to show the editor on page load
+                self.fields["use_python_code"].widget.attrs['data-show-editor'] = 'true'
 
     def get_default_code(self):
         """Get default Python code template."""

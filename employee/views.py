@@ -3504,10 +3504,10 @@ def company_tree_view(request):
             nodes.append({
                 "name": employee.get_full_name(),
                 "title": getattr(
-                    employee.get_job_position(), "job_position", _("Not set")
+                    employee.get_job_position(), "job_position", str(_("Not set"))
                 ),
                 "department": getattr(
-                    employee.get_department(), "department", _("Not set")
+                    employee.get_department(), "department", str(_("Not set"))
                 ),
                 "className": "middle-level",
                 "children": create_hierarchy(employee),
@@ -3534,8 +3534,8 @@ def company_tree_view(request):
         manager = top_managers.first()
         tree_data = {
             "name": manager.get_full_name(),
-            "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
-            "department": getattr(manager.get_department(), "department", _("Not set")),
+            "title": getattr(manager.get_job_position(), "job_position", str(_("Not set"))),
+            "department": getattr(manager.get_department(), "department", str(_("Not set"))),
             "children": create_hierarchy(manager),
         }
     elif top_managers.count() > 1:
@@ -3544,14 +3544,14 @@ def company_tree_view(request):
         for manager in top_managers:
             children.append({
                 "name": manager.get_full_name(),
-                "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
-                "department": getattr(manager.get_department(), "department", _("Not set")),
+                "title": getattr(manager.get_job_position(), "job_position", str(_("Not set"))),
+                "department": getattr(manager.get_department(), "department", str(_("Not set"))),
                 "children": create_hierarchy(manager),
             })
         
         tree_data = {
-            "name": _("Company Organization"),
-            "title": _("All Departments"),
+            "name": str(_("Company Organization")),
+            "title": str(_("All Departments")),
             "department": "",
             "className": "top-level",
             "children": children,
@@ -3559,8 +3559,8 @@ def company_tree_view(request):
     else:
         # No top managers found
         tree_data = {
-            "name": _("No Organization Structure"),
-            "title": _("Please set reporting managers"),
+            "name": str(_("No Organization Structure")),
+            "title": str(_("Please set reporting managers")),
             "department": "",
             "children": [],
         }

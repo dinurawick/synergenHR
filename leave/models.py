@@ -242,7 +242,12 @@ class LeaveType(HorillaModel):
         max_length=30, choices=CHOICES, default="no", verbose_name=_("Exclude Weekends")
     )
     is_compensatory_leave = models.BooleanField(default=False)
-    
+    monthly_recurring = models.BooleanField(
+        default=False,
+        verbose_name=_("Monthly Recurring"),
+        help_text=_("If enabled, employees assigned this leave type will receive the allocated leave days every month automatically."),
+    )
+
     # Conditional formatting for dynamic leave allocation
     use_conditional_formatting = models.BooleanField(
         default=False,
@@ -1022,19 +1027,35 @@ class LeaveRequest(HorillaModel):
         if f"{today.month}-{today.year}" in unique_dates:
             unique_dates.remove(f"{today.strftime('%m')}-{today.year}")
 
-        forcated_days = available_leave.forcasted_leaves(self.start_date)
+        if leave_type.monthly_recurring:
+            # Per-month balance: total_days minus what's already taken/requested this month
+            import calendar as _cal
+            month_start = self.start_date.replace(day=1)
+            month_end = self.start_date.replace(
+                day=_cal.monthrange(self.start_date.year, self.start_date.month)[1]
+            )
+            taken_this_month = LeaveRequest.objects.filter(
+                employee_id=self.employee_id,
+                leave_type_id=leave_type,
+                status__in=["approved", "requested"],
+                start_date__lte=month_end,
+                end_date__gte=month_start,
+            ).exclude(id=self.id).aggregate(total=Sum("requested_days"))["total"] or 0
+            total_leave_days = max(leave_type.total_days - taken_this_month, 0)
+        else:
+            forcated_days = available_leave.forcasted_leaves(self.start_date)
 
-        available_days = available_leave.available_days or 0
-        carryforward_days = available_leave.carryforward_days or 0
-        carryforward_max = available_leave.leave_type_id.carryforward_max or 0
-        carryforward_type = available_leave.leave_type_id.carryforward_type
+            available_days = available_leave.available_days or 0
+            carryforward_days = available_leave.carryforward_days or 0
+            carryforward_max = available_leave.leave_type_id.carryforward_max or 0
+            carryforward_type = available_leave.leave_type_id.carryforward_type
 
-        if carryforward_type in ["carryforward", "carryforward expire"]:
-            carryforward_days = min(carryforward_days, carryforward_max)
-        elif carryforward_type == "no carryforward":
-            carryforward_days = 0
+            if carryforward_type in ["carryforward", "carryforward expire"]:
+                carryforward_days = min(carryforward_days, carryforward_max)
+            elif carryforward_type == "no carryforward":
+                carryforward_days = 0
 
-        total_leave_days = available_days + carryforward_days + forcated_days
+            total_leave_days = available_days + carryforward_days + forcated_days
 
         if not effective_requested_days <= total_leave_days:
             raise ValidationError(

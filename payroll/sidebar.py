@@ -3,7 +3,7 @@ payroll/sidebar.py
 
 """
 
-from django.urls import reverse
+from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as trans
 
 MENU = trans("Payroll")
@@ -12,13 +12,18 @@ IMG_SRC = "images/ui/wallet-outline.svg"
 SUBMENUS = [
     {
         "menu": trans("Dashboard"),
-        "redirect": reverse("view-payroll-dashboard"),
+        "redirect": reverse_lazy("view-payroll-dashboard"),
         "accessibility": "payroll.sidebar.dasbhoard_accessibility",
     },
     {
         "menu": trans("Contract"),
-        "redirect": reverse("view-contract"),
+        "redirect": reverse_lazy("view-contract"),
         "accessibility": "payroll.sidebar.dasbhoard_accessibility",
+    },
+    {
+        "menu": trans("Payroll Runs"),
+        "redirect": reverse_lazy("payroll-run-list"),
+        "accessibility": "payroll.sidebar.payroll_run_accessibility",
     },
     {
         "menu": trans("Pay Items"),
@@ -27,32 +32,32 @@ SUBMENUS = [
         "submenus": [
             {
                 "menu": trans("Earnings"),
-                "redirect": reverse("view-allowance"),
+                "redirect": reverse_lazy("view-allowance"),
                 "accessibility": "payroll.sidebar.allowance_accessibility",
             },
             {
                 "menu": trans("Deductions"),
-                "redirect": reverse("view-deduction"),
+                "redirect": reverse_lazy("view-deduction"),
                 "accessibility": "payroll.sidebar.deduction_accessibility",
             },
         ],
     },
     {
         "menu": trans("Payslips"),
-        "redirect": reverse("view-payslip"),
+        "redirect": reverse_lazy("view-payslip"),
     },
     {
         "menu": trans("Loan / Advanced Salary"),
-        "redirect": reverse("view-loan"),
+        "redirect": reverse_lazy("view-loan"),
         "accessibility": "payroll.sidebar.loan_accessibility",
     },
     {
         "menu": trans("Encashments & Reimbursements"),
-        "redirect": reverse("view-reimbursement"),
+        "redirect": reverse_lazy("view-reimbursement"),
     },
     {
         "menu": trans("Tax"),
-        "redirect": reverse("filing-status-view"),
+        "redirect": reverse_lazy("filing-status-view"),
         "accessibility": "payroll.sidebar.federal_tax_accessibility",
     },
     {
@@ -109,3 +114,7 @@ def bank_accessibility(request, submenu, user_perms, *args, **kwargs):
 
 def branch_accessibility(request, submenu, user_perms, *args, **kwargs):
     return request.user.has_perm("employee.view_bankbranch")
+
+
+def payroll_run_accessibility(request, submenu, user_perms, *args, **kwargs):
+    return request.user.has_perm("payroll.view_payrollrun")

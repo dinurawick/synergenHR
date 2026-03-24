@@ -99,6 +99,16 @@
 <script>
     var iFrame = document.getElementById('oc-editor');
 
+    // Check if we should show the editor on page load (for editing existing Python code)
+    $(document).ready(function() {
+        const usePythonCodeCheckbox = $('[name="use_python_code"]');
+        if (usePythonCodeCheckbox.is(':checked') || usePythonCodeCheckbox.attr('data-show-editor') === 'true') {
+            $('#oc-editor').show();
+        } else {
+            $('#oc-editor').hide();
+        }
+    });
+
     // Make sure the iframe is fully loaded before sending the postMessage
     iFrame.onload = function () {
         // Populate the code in the OneCompiler editor

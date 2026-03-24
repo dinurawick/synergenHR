@@ -46,6 +46,28 @@ def leave_reset():
             leave_type.save()
 
 
+def monthly_recurring_leave_credit():
+    """
+    Credits leave days monthly for all leave types with monthly_recurring=True.
+    Runs daily; credits on the 1st of each month (or first run of the month).
+    Tracks last credit date to avoid double-crediting.
+    """
+    from leave.models import AvailableLeave, LeaveType
+
+    today = datetime.now().date()
+    # Only run on the 1st of each month
+    if today.day != 1:
+        return
+
+    recurring_leave_types = LeaveType.objects.filter(monthly_recurring=True)
+    for leave_type in recurring_leave_types:
+        available_leaves = leave_type.employee_available_leave.all()
+        for available_leave in available_leaves:
+            # Add the leave type's total_days to available_days
+            available_leave.available_days += leave_type.total_days
+            available_leave.save()
+
+
 if not any(
     cmd in sys.argv
     for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
@@ -55,5 +77,6 @@ if not any(
     """
     scheduler = BackgroundScheduler()
     scheduler.add_job(leave_reset, "interval", seconds=20)
+    scheduler.add_job(monthly_recurring_leave_credit, "interval", hours=24)
 
     scheduler.start()

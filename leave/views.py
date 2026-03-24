@@ -15,7 +15,7 @@ from django.apps import apps
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import ProtectedError, Q
+from django.db.models import ProtectedError, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -424,7 +424,7 @@ def leave_request_creation(request, type_id=None, emp_id=None):
     POST : return leave request view
     """
     referer_parts = [
-        part for part in request.META.get("HTTP_REFERER").split("/") if part != ""
+        part for part in (request.META.get("HTTP_REFERER") or "").split("/") if part != ""
     ]
     if request.GET.urlencode().startswith("pd="):
         previous_data = unquote(request.GET.urlencode())[len("pd=") :]
@@ -539,7 +539,7 @@ def leave_request_creation(request, type_id=None, emp_id=None):
                         redirect=reverse("request-view") + f"?id={leave_request.id}",
                     )
                 form = LeaveRequestCreationForm()
-                if referer_parts[-2] == "employee-view":
+                if len(referer_parts) >= 2 and referer_parts[-2] == "employee-view":
                     return HttpResponse("<script>window.location.reload();</script>")
 
             leave_requests = LeaveRequest.objects.all()
@@ -4058,21 +4058,39 @@ def employee_available_leave_count(request):
 
     if available_leave:
         leave_type = available_leave.leave_type_id
-        total_leave_days = available_leave.total_leave_days
 
-        next_reset = leave_type.leave_type_next_reset_date()
-        if next_reset and start_date >= next_reset:
-            forcasted_days = available_leave.forcasted_leaves(start_date)
+        if leave_type.monthly_recurring and start_date:
+            # For monthly recurring leave types, calculate per-month balance:
+            # available = total_days - days taken in the same month/year as start_date
+            month_start = start_date.replace(day=1)
+            import calendar as _cal
+            month_end = start_date.replace(
+                day=_cal.monthrange(start_date.year, start_date.month)[1]
+            )
+            taken_this_month = LeaveRequest.objects.filter(
+                employee_id=available_leave.employee_id,
+                leave_type_id=leave_type,
+                status__in=["approved", "requested"],
+                start_date__lte=month_end,
+                end_date__gte=month_start,
+            ).aggregate(total=Sum("requested_days"))["total"] or 0
+            total_leave_days = max(leave_type.total_days - taken_this_month, 0)
+        else:
+            total_leave_days = available_leave.total_leave_days
 
-            if leave_type.carryforward_type == "no carryforward":
-                total_leave_days = 0
-            elif (
-                leave_type.carryforward_type in ["carryforward", "carryforward expire"]
-                and leave_type.carryforward_max < total_leave_days
-            ):
-                total_leave_days = leave_type.carryforward_max
+            next_reset = leave_type.leave_type_next_reset_date()
+            if next_reset and start_date >= next_reset:
+                forcasted_days = available_leave.forcasted_leaves(start_date)
 
-            total_leave_days += forcasted_days
+                if leave_type.carryforward_type == "no carryforward":
+                    total_leave_days = 0
+                elif (
+                    leave_type.carryforward_type in ["carryforward", "carryforward expire"]
+                    and leave_type.carryforward_max < total_leave_days
+                ):
+                    total_leave_days = leave_type.carryforward_max
+
+                total_leave_days += forcasted_days
 
         # Only query pending requests if we have a valid employee
         if available_leave.employee_id_id:
