@@ -130,9 +130,7 @@ dmypy.json
 
 *.pyc
 
-# migration files
-**/migrations/**
-!**/migrations
+# migration files - tracked so DB schema changes deploy correctly
 !**/migrations/__init__.py
 
 # media file
