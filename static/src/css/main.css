@@ -11022,6 +11022,20 @@ select.oh-select--lg {
   display: none;
 }
 
+/* Mobile scroll lock fix for SweetAlert2 */
+@media (max-width: 768px) {
+    body.swal2-shown {
+        overflow: auto !important;
+        position: static !important;
+    }
+    
+    .swal2-container {
+        padding: 0.625em;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
 .oh-modal {
   position: fixed;
   background-color: rgba(28, 28, 28, 0.2);

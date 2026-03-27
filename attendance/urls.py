@@ -29,6 +29,15 @@ urlpatterns = [
     path("attendance-create", views.attendance_create, name="attendance-create"),
     path("attendance-excel", views.attendance_excel, name="attendance-excel"),
     path(
+        "simple-csv-import-form", views.simple_csv_import_form, name="simple-csv-import-form"
+    ),
+    path(
+        "simple-csv-template", views.simple_csv_template, name="simple-csv-template"
+    ),
+    path(
+        "simple-csv-import", views.simple_csv_import, name="simple-csv-import"
+    ),
+    path(
         "attendance-info-import", views.attendance_import, name="attendance-info-import"
     ),
     path(

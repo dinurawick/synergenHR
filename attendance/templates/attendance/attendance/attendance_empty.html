@@ -70,9 +70,16 @@
                 <div class="oh-dropdown__menu oh-dropdown__menu--right" x-show="open" style="display: none">
                     <ul class="oh-dropdown__items">
                         {% if perms.attendance.change_attendance or request.user|is_reportingmanager %}
+                        {% comment %}
                         <li class="oh-dropdown__item">
                             <a href="#" class="oh-dropdown__link" id="attendance-info-import"
-                                data-toggle="oh-modal-toggle" data-target="#attendanceImport">{% trans "Import" %}</a>
+                                data-toggle="oh-modal-toggle" data-target="#attendanceImport">{% trans "Import Excel" %}</a>
+                        </li>
+                        {% endcomment %}
+                        <li class="oh-dropdown__item">
+                            <a href="#" class="oh-dropdown__link" id="simpleCsvImport" data-toggle="oh-modal-toggle"
+                                data-target="#objectCreateModal" hx-get="{% url 'simple-csv-import-form' %}"
+                                hx-target="#objectCreateModalTarget">{% trans "Import" %}</a>
                         </li>
                         {% endif %}
                     </ul>

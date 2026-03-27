@@ -686,6 +686,67 @@ $(function () {
     });
 });
 
+// Global SweetAlert cleanup function to fix mobile scroll lock issue
+$(document).ready(function() {
+    // Function to ensure body scroll is restored
+    function restoreBodyScroll() {
+        setTimeout(function() {
+            $('body').removeClass('swal2-shown swal2-height-auto swal2-no-backdrop swal2-toast-shown');
+            $('body').css('overflow', '');
+            // Also remove any inline styles that might be blocking scroll
+            if ($('body').attr('style')) {
+                var currentStyle = $('body').attr('style');
+                var newStyle = currentStyle.replace(/overflow\s*:\s*[^;]*;?/gi, '');
+                $('body').attr('style', newStyle);
+            }
+        }, 100);
+    }
+    
+    // Cleanup after SweetAlert buttons are clicked
+    $(document).on('click', '.swal2-confirm, .swal2-cancel, .swal2-close', function() {
+        restoreBodyScroll();
+    });
+    
+    // Cleanup on backdrop click (when clicking outside the modal)
+    $(document).on('click', '.swal2-container', function(e) {
+        if (e.target === this) {
+            restoreBodyScroll();
+        }
+    });
+    
+    // Cleanup when ESC key is pressed
+    $(document).on('keydown', function(e) {
+        if (e.keyCode === 27 && $('.swal2-container').is(':visible')) {
+            restoreBodyScroll();
+        }
+    });
+    
+    // Additional cleanup for auto-closing alerts (like timers)
+    var originalSwalFire = Swal.fire;
+    Swal.fire = function() {
+        var result = originalSwalFire.apply(this, arguments);
+        
+        // If it's a promise (which it should be), add cleanup
+        if (result && typeof result.then === 'function') {
+            result.then(function() {
+                restoreBodyScroll();
+            }).catch(function() {
+                restoreBodyScroll();
+            });
+        }
+        
+        return result;
+    };
+    
+    // Fallback cleanup - check every 2 seconds if body is stuck with scroll lock
+    setInterval(function() {
+        if ($('body').hasClass('swal2-shown') && !$('.swal2-container').is(':visible')) {
+            console.log('SweetAlert cleanup: Removing stuck scroll lock');
+            restoreBodyScroll();
+        }
+    }, 2000);
+});
+
 $(document).on('click', '.oh-kanban__card-body-collapse', function (e) {
     e.preventDefault();
 

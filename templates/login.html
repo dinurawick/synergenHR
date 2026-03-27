@@ -199,6 +199,12 @@
                     text: 'Your login credentials are currently blocked. Please contact HR administrators for assistance.',
                     icon: 'warning',
                     confirmButtonText: 'OK',
+                }).then(function() {
+                    // Ensure body scroll is restored after login warning
+                    setTimeout(function() {
+                        $('body').removeClass('swal2-shown swal2-height-auto swal2-no-backdrop swal2-toast-shown');
+                        $('body').css('overflow', '');
+                    }, 100);
                 });
             }
         });

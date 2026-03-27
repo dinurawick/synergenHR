@@ -101,6 +101,10 @@ from attendance.models import (
 )
 from attendance.views.handle_attendance_errors import handle_attendance_errors
 from attendance.views.process_attendance_data import process_attendance_data
+from attendance.views.process_simple_csv import (
+    map_simple_csv_to_system_format,
+    validate_simple_csv_format,
+)
 from base.forms import AttendanceAllowedIPForm, TrackLateComeEarlyOutForm
 from base.methods import (
     choosesubordinates,
@@ -268,6 +272,128 @@ def attendance_excel(_request):
         return response
     except Exception as exception:
         return HttpResponse(exception)
+
+
+@login_required
+@permission_required("attendance.add_attendance")
+def simple_csv_import_form(request):
+    """
+    Render the simple CSV import form template.
+    
+    Returns:
+        HttpResponse: Rendered template for simple CSV import
+    """
+    return render(request, "attendance/simple_csv/import_simple_csv.html")
+
+
+@login_required
+@permission_required("attendance.add_attendance")
+def simple_csv_template(_request):
+    """
+    Generate a CSV template for simple attendance format: employee_id, in_date, in_time, out_date, out_time
+
+    Returns:
+        HttpResponse: CSV template with sample data
+    """
+    try:
+        # Create sample data to show the expected format
+        sample_data = {
+            "employee_id": ["EMP001", "EMP002", "EMP003"],
+            "in_date": ["2024-03-25", "2024-03-25", "2024-03-25"],
+            "in_time": ["09:00:00", "08:45:00", "09:15:00"],
+            "out_date": ["2024-03-25", "2024-03-25", "2024-03-25"],
+            "out_time": ["17:30:00", "17:15:00", "18:00:00"]
+        }
+        
+        data_frame = pd.DataFrame(sample_data)
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="simple_attendance_template.csv"'
+        data_frame.to_csv(response, index=False)
+        return response
+    except Exception as exception:
+        return HttpResponse(f"Error generating template: {exception}")
+
+
+@login_required
+@permission_required("attendance.add_attendance")
+def simple_csv_import(request):
+    """
+    Import attendance from simple CSV format: employee_id, in_date, in_time, out_date, out_time
+    
+    This function transforms the simple CSV format to the system's expected format
+    and then uses the existing processing logic for validation and creation.
+    
+    Parameters:
+        request (HttpRequest): The HTTP request object containing the uploaded CSV file.
+
+    Returns:
+        HttpResponse: Response with import results (success/error counts and error file if needed)
+    """
+    if request.method == "POST":
+        try:
+            file = request.FILES["simple_attendance_import"]
+            file_extension = file.name.split(".")[-1].lower()
+            
+            # Only accept CSV files for this simple format
+            if file_extension != "csv":
+                context = {
+                    "created_count": 0,
+                    "error_count": 1,
+                    "model": _("Simple Attendance"),
+                    "path_info": None,
+                    "error_message": "Only CSV files are supported for simple format import."
+                }
+                html = render_to_string("import_popup.html", context)
+                return HttpResponse(html)
+            
+            # Read the simple CSV format
+            data_frame = pd.read_csv(file)
+            
+            # Validate the CSV format
+            is_valid, error_messages = validate_simple_csv_format(data_frame)
+            
+            if not is_valid:
+                context = {
+                    "created_count": 0,
+                    "error_count": len(error_messages),
+                    "model": _("Simple Attendance"),
+                    "path_info": None,
+                    "error_message": "; ".join(error_messages)
+                }
+                html = render_to_string("import_popup.html", context)
+                return HttpResponse(html)
+            
+            # Transform simple format to system format
+            system_format_data = map_simple_csv_to_system_format(data_frame)
+            
+            # Use existing processing logic
+            attendance_import = process_attendance_data(system_format_data)
+            
+            # Handle errors using existing error handling
+            path_info = None
+            if attendance_import:
+                path_info = handle_attendance_errors(attendance_import)
+
+            created_attendance_count = len(system_format_data) - len(attendance_import)
+            context = {
+                "created_count": created_attendance_count,
+                "error_count": len(attendance_import),
+                "model": _("Simple Attendance"),
+                "path_info": path_info,
+            }
+            html = render_to_string("import_popup.html", context)
+            return HttpResponse(html)
+            
+        except Exception as e:
+            context = {
+                "created_count": 0,
+                "error_count": 1,
+                "model": _("Simple Attendance"),
+                "path_info": None,
+                "error_message": f"Import failed: {str(e)}"
+            }
+            html = render_to_string("import_popup.html", context)
+            return HttpResponse(html)
 
 
 @login_required

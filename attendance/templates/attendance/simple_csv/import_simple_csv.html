@@ -1,0 +1,84 @@
+{% load i18n %}
+<div class="oh-modal__dialog-header pb-0">
+    <h2 class="oh-modal__dialog-title" id="simpleCsvImportLabel">
+        {% trans "Import Attendance" %}
+    </h2>
+
+    <button class="oh-modal__close" aria-label="Close">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+
+<div class="oh-modal__dialog-body" id="simpleCsvImportModalBody">
+    <div class="alert alert-info mb-3">
+        <strong>{% trans "CSV Format:" %}</strong> employee_id, in_date, in_time, out_date, out_time<br>
+        <small>{% trans "Example: EMP001, 2024-03-25, 09:00:00, 2024-03-25, 17:30:00" %}</small>
+    </div>
+    
+    <form hx-post="{% url 'simple-csv-import' %}" hx-encoding="multipart/form-data"
+        hx-target="#objectCreateModalTarget" hx-swap="outerHTML" class="oh-profile-section" id="simpleCsvImportForm">
+        {% csrf_token %}
+        <div id="uploading" class="oh-modal__dialog-body mr-5" style="display: none;">
+            <div class="loader-container" style="margin: auto;">
+                <div class="loader"></div>
+                <div class="loader-text">{% trans "Processing CSV..." %}</div>
+                <div class="text-center" style="-webkit-text-stroke: medium;">
+                    {% trans "Don't refresh the page" %}
+                </div>
+            </div>
+        </div>
+
+        <div id="uploadContainer">
+            <label for="uploadFile" class="oh-dropdown__import-label">
+                <ion-icon name="cloud-upload" class="oh-dropdown__import-form-icon"></ion-icon>
+                <span class="oh-dropdown__import-form-title">{% trans "Upload CSV File" %}</span>
+                <span class="oh-dropdown__import-form-text">{% trans "Drag and drop CSV file here" %}</span>
+            </label>
+            <input type="file" name="simple_attendance_import" accept=".csv" required />
+            <div class="d-flex flex-row-reverse">
+                <button type="submit" class="oh-btn oh-btn--small oh-btn--secondary mt-3">
+                    {% trans "Upload" %}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    $(document).ready(function () {
+        Swal.fire({
+            text: "{% trans 'Do you want to download the CSV template?' %}",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonColor: "#008000",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "{% trans 'Download Template' %}",
+            cancelButtonText: "{% trans 'Skip' %}"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    type: "GET",
+                    url: "{% url 'simple-csv-template' %}",
+                    xhrFields: { responseType: "blob" },
+                    success: function (response) {
+                        const url = URL.createObjectURL(new Blob([response], { type: "text/csv" }));
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = "simple_attendance_template.csv";
+                        document.body.appendChild(link);
+                        link.click();
+                        URL.revokeObjectURL(url);
+                    },
+                    error: function () {
+                        // Template download failed - user will need to create CSV manually
+                    }
+                });
+            }
+        });
+
+        $('#simpleCsvImportForm').on('submit', function () {
+            $('#uploadContainer').hide();
+            $('#uploading').show();
+        });
+    });
+</script>
