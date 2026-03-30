@@ -264,6 +264,20 @@
                         </div>
                     </div>
                     
+                    <!-- Recurring Carry Forward -->
+                    <div class="col-sm-12 col-md-12 col-lg-6" id="recurring_carry_forward_container">
+                        <div class="oh-input-group oh-label__info justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <label for="id_recurring_carry_forward" class="oh-label">{{ form.recurring_carry_forward.label }}</label>
+                                <span class=" oh-info me-3" title="{% trans 'If enabled, unused leave days from the previous month carry over to the next month.' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3 ">
+                                {{ form.recurring_carry_forward }}
+                                {{ form.recurring_carry_forward.errors }}
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Gender Restriction Field -->
                     <div class="col-sm-12 col-md-12 col-lg-6">
                         <div class="oh-input-group oh-label__info">
@@ -684,6 +698,18 @@
     
     // Initialize gender note on page load
     $('#id_gender_restriction').trigger('change');
+
+    // Monthly Recurring - show/hide carry forward toggle
+    function toggleRecurringCarryForward() {
+        if ($('#id_monthly_recurring').is(':checked')) {
+            $('#recurring_carry_forward_container').show();
+        } else {
+            $('#recurring_carry_forward_container').hide();
+            $('#id_recurring_carry_forward').prop('checked', false);
+        }
+    }
+    $('#id_monthly_recurring').change(toggleRecurringCarryForward);
+    toggleRecurringCarryForward();
 </script>
 
 {% endblock %}

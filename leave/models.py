@@ -247,6 +247,11 @@ class LeaveType(HorillaModel):
         verbose_name=_("Monthly Recurring"),
         help_text=_("If enabled, employees assigned this leave type will receive the allocated leave days every month automatically."),
     )
+    recurring_carry_forward = models.BooleanField(
+        default=False,
+        verbose_name=_("Recurring Carry Forward"),
+        help_text=_("If enabled, unused leave days from the previous month carry over to the next month."),
+    )
 
     # Conditional formatting for dynamic leave allocation
     use_conditional_formatting = models.BooleanField(
@@ -1028,20 +1033,33 @@ class LeaveRequest(HorillaModel):
             unique_dates.remove(f"{today.strftime('%m')}-{today.year}")
 
         if leave_type.monthly_recurring:
-            # Per-month balance: total_days minus what's already taken/requested this month
+            # Walk month by month from assigned_date to get correct balance with carry forward
             import calendar as _cal
-            month_start = self.start_date.replace(day=1)
-            month_end = self.start_date.replace(
-                day=_cal.monthrange(self.start_date.year, self.start_date.month)[1]
-            )
-            taken_this_month = LeaveRequest.objects.filter(
-                employee_id=self.employee_id,
-                leave_type_id=leave_type,
-                status__in=["approved", "requested"],
-                start_date__lte=month_end,
-                end_date__gte=month_start,
-            ).exclude(id=self.id).aggregate(total=Sum("requested_days"))["total"] or 0
-            total_leave_days = max(leave_type.total_days - taken_this_month, 0)
+            from dateutil.relativedelta import relativedelta
+
+            cursor = available_leave.assigned_date.replace(day=1)
+            target_month = self.start_date.replace(day=1)
+            carry = 0
+
+            while cursor <= target_month:
+                m_end = cursor.replace(day=_cal.monthrange(cursor.year, cursor.month)[1])
+                taken = LeaveRequest.objects.filter(
+                    employee_id=self.employee_id,
+                    leave_type_id=leave_type,
+                    status__in=["approved", "requested"],
+                    start_date__lte=m_end,
+                    end_date__gte=cursor,
+                ).exclude(id=self.id).aggregate(total=Sum("requested_days"))["total"] or 0
+
+                if leave_type.recurring_carry_forward:
+                    balance = leave_type.total_days + carry - taken
+                else:
+                    balance = leave_type.total_days - taken
+
+                carry = max(balance, 0)
+                cursor += relativedelta(months=1)
+
+            total_leave_days = max(carry, 0)
         else:
             forcated_days = available_leave.forcasted_leaves(self.start_date)
 

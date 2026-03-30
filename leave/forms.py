@@ -145,6 +145,7 @@ class LeaveTypeForm(ConditionForm):
                 "style": "background-color: white !important; color: black !important;"
             }),
             "monthly_recurring": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
+            "recurring_carry_forward": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
         }
 
     def clean(self):
@@ -332,6 +333,7 @@ class UpdateLeaveTypeForm(ConditionForm):
             'require_approval', 'require_attachment', 'exclude_company_leave',
             'exclude_holiday', 'exclude_weekends', 'is_compensatory_leave',
             'monthly_recurring',
+            'recurring_carry_forward',
             'use_conditional_formatting', 'conditional_formatting_rule', 'gender_restriction', 'company_id'
         ]
         widgets = {

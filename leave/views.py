@@ -1039,10 +1039,19 @@ def leave_request_approve(request, id, emp_id=None):
     total_available_leave = (
         available_leave.available_days + available_leave.carryforward_days
     )
+    if leave_type_id.monthly_recurring:
+        total_available_leave = get_monthly_recurring_balance(
+            available_leave, leave_request.start_date
+        )
     send_notification = False
     if leave_request.status != "approved":
         if total_available_leave >= leave_request.requested_days:
-            if leave_request.requested_days > available_leave.carryforward_days:
+            if leave_type_id.monthly_recurring:
+                # For monthly recurring, balance is computed from LeaveRequest history.
+                # No need to touch AvailableLeave stored days — just mark as approved.
+                leave_request.approved_available_days = leave_request.requested_days
+                leave_request.approved_carryforward_days = 0
+            elif leave_request.requested_days > available_leave.carryforward_days:
                 leave = leave_request.requested_days - available_leave.carryforward_days
                 leave_request.approved_carryforward_days = (
                     available_leave.carryforward_days
@@ -4024,6 +4033,41 @@ def user_request_select_filter(request):
         return JsonResponse(context)
 
 
+def get_monthly_recurring_balance(available_leave, target_date):
+    """
+    Compute the effective available balance for a monthly recurring leave type
+    on a given target_date, walking month by month from assigned_date.
+    Respects recurring_carry_forward setting.
+    """
+    import calendar as _cal
+    from dateutil.relativedelta import relativedelta
+
+    leave_type = available_leave.leave_type_id
+    cursor = available_leave.assigned_date.replace(day=1)
+    target_month = target_date.replace(day=1)
+    carry = 0
+
+    while cursor <= target_month:
+        month_end = cursor.replace(day=_cal.monthrange(cursor.year, cursor.month)[1])
+        taken = LeaveRequest.objects.filter(
+            employee_id=available_leave.employee_id,
+            leave_type_id=leave_type,
+            status__in=["approved", "requested"],
+            start_date__lte=month_end,
+            end_date__gte=cursor,
+        ).aggregate(total=Sum("requested_days"))["total"] or 0
+
+        if leave_type.recurring_carry_forward:
+            balance = leave_type.total_days + carry - taken
+        else:
+            balance = leave_type.total_days - taken
+
+        carry = max(balance, 0)
+        cursor += relativedelta(months=1)
+
+    return max(carry, 0)
+
+
 @login_required
 @hx_request_required
 def employee_available_leave_count(request):
@@ -4060,21 +4104,7 @@ def employee_available_leave_count(request):
         leave_type = available_leave.leave_type_id
 
         if leave_type.monthly_recurring and start_date:
-            # For monthly recurring leave types, calculate per-month balance:
-            # available = total_days - days taken in the same month/year as start_date
-            month_start = start_date.replace(day=1)
-            import calendar as _cal
-            month_end = start_date.replace(
-                day=_cal.monthrange(start_date.year, start_date.month)[1]
-            )
-            taken_this_month = LeaveRequest.objects.filter(
-                employee_id=available_leave.employee_id,
-                leave_type_id=leave_type,
-                status__in=["approved", "requested"],
-                start_date__lte=month_end,
-                end_date__gte=month_start,
-            ).aggregate(total=Sum("requested_days"))["total"] or 0
-            total_leave_days = max(leave_type.total_days - taken_this_month, 0)
+            total_leave_days = get_monthly_recurring_balance(available_leave, start_date)
         else:
             total_leave_days = available_leave.total_leave_days
 
