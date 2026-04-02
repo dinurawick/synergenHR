@@ -230,6 +230,69 @@ urlpatterns = [
         "bonus-points-tab/<int:emp_id>", views.bonus_points_tab, name="bonus-points-tab"
     ),
     path(
+        "dependent-details-tab/<int:emp_id>", 
+        views.dependent_details_tab, 
+        name="dependent-details-tab"
+    ),
+    path(
+        "work-experience-tab/<int:emp_id>", 
+        views.work_experience_tab, 
+        name="work-experience-tab"
+    ),
+    path(
+        "educational-qualifications-tab/<int:emp_id>", 
+        views.educational_qualifications_tab, 
+        name="educational-qualifications-tab"
+    ),
+    # Dependent Details CRUD URLs
+    path(
+        "dependent-create/<int:emp_id>/", 
+        views.dependent_create, 
+        name="dependent-create"
+    ),
+    path(
+        "dependent-update/<int:emp_id>/<int:dependent_id>/", 
+        views.dependent_update, 
+        name="dependent-update"
+    ),
+    path(
+        "dependent-delete/<int:emp_id>/<int:dependent_id>/", 
+        views.dependent_delete, 
+        name="dependent-delete"
+    ),
+    # Work Experience CRUD URLs
+    path(
+        "work-experience-create/<int:emp_id>/", 
+        views.work_experience_create, 
+        name="work-experience-create"
+    ),
+    path(
+        "work-experience-update/<int:emp_id>/<int:experience_id>/", 
+        views.work_experience_update, 
+        name="work-experience-update"
+    ),
+    path(
+        "work-experience-delete/<int:emp_id>/<int:experience_id>/", 
+        views.work_experience_delete, 
+        name="work-experience-delete"
+    ),
+    # Educational Qualifications CRUD URLs
+    path(
+        "educational-qualification-create/<int:emp_id>/", 
+        views.educational_qualification_create, 
+        name="educational-qualification-create"
+    ),
+    path(
+        "educational-qualification-update/<int:emp_id>/<int:qualification_id>/", 
+        views.educational_qualification_update, 
+        name="educational-qualification-update"
+    ),
+    path(
+        "educational-qualification-delete/<int:emp_id>/<int:qualification_id>/", 
+        views.educational_qualification_delete, 
+        name="educational-qualification-delete"
+    ),
+    path(
         "add-bonus-points/<int:emp_id>", views.add_bonus_points, name="add-bonus-points"
     ),
     path("redeem-points/<int:emp_id>", views.redeem_points, name="redeem-points"),

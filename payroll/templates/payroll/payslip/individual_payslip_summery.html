@@ -169,6 +169,7 @@
                 </td>
             </tr>
             {% for deduction in basic_pay_deductions %}
+                {% if not deduction.employer_contribution_amount %}
                 <tr class="oh-payslip__table-tr" style="color: gray;">
                     <td class="oh-payslip__table-td">
                         {{deduction.title}}
@@ -181,8 +182,10 @@
                         {{deduction.amount|floatformat:2|currency_symbol_position}}
                     </td>
                 </tr>
+                {% endif %}
             {% endfor %}
             {% for deduction in gross_pay_deductions %}
+                {% if not deduction.employer_contribution_amount %}
                 <tr class="oh-payslip__table-tr" style="color: gray;">
                     <td class="oh-payslip__table-td">
                         {{deduction.title}}
@@ -195,9 +198,10 @@
                         {{deduction.amount|floatformat:2|currency_symbol_position}}
                     </td>
                 </tr>
+                {% endif %}
             {% endfor %}
             {% for deduction in pretax_deductions %}
-                {% if not deduction.is_employer_contribution %}
+                {% if not deduction.is_employer_contribution and not deduction.employer_contribution_amount and deduction.amount > 0 %}
                 <tr class="oh-payslip__table-tr">
                     <td class="oh-payslip__table-td">{{deduction.title}}</td>
                     <td class="oh-payslip__table-td">
@@ -207,7 +211,7 @@
                 {% endif %}
             {% endfor %}
             {% for deduction in post_tax_deductions %}
-                {% if not deduction.is_employer_contribution %}
+                {% if not deduction.is_employer_contribution and not deduction.employer_contribution_amount and deduction.amount > 0 %}
                 <tr class="oh-payslip__table-tr">
                     <td class="oh-payslip__table-td">{{deduction.title}}</td>
                     <td class="oh-payslip__table-td">
@@ -223,7 +227,7 @@
                 </td>
             </tr>
             {% for deduction in tax_deductions %}
-                {% if not deduction.is_employer_contribution %}
+                {% if not deduction.is_employer_contribution and not deduction.employer_contribution_amount and deduction.amount > 0 %}
                 <tr class="oh-payslip__table-tr">
                     <td class="oh-payslip__table-td">{{deduction.title}}</td>
                     <td class="oh-payslip__table-td">
@@ -233,7 +237,7 @@
                 {% endif %}
             {% endfor %}
             {% for deduction in net_deductions %}
-                {% if not deduction.is_employer_contribution %}
+                {% if not deduction.is_employer_contribution and not deduction.employer_contribution_amount and deduction.amount > 0 %}
                 <tr class="oh-payslip__table-tr" style="color: gray;">
                     <td class="oh-payslip__table-td">
                         {{deduction.title}}
@@ -276,69 +280,19 @@
             </tr>
         </thead>
         <tbody class="oh-payslip__table-tbody">
-            {% for deduction in pretax_deductions %}
-                {% if deduction.is_employer_contribution %}
+            {% for contribution in employer_contributions %}
                 <tr class="oh-payslip__table-tr" style="color: #d2691e;">
                     <td class="oh-payslip__table-td">
-                        {{deduction.title}}
+                        {{contribution.title}} ({{contribution.employer_contribution_rate|floatformat:1}}%)
                         <i style="font-style: italic; margin-left: 10px; font-weight: normal;"
                         title="{% trans "Employer Contribution to Government" %}">
                             <ion-icon name="information-circle-outline" style="color:orange;" role="img" class="md hydrated" aria-label="information circle outline"></ion-icon>
                         </i>
                     </td>
                     <td class="oh-payslip__table-td">
-                        {{deduction.amount|floatformat:2|currency_symbol_position}}
+                        {{contribution.amount|floatformat:2|currency_symbol_position}}
                     </td>
                 </tr>
-                {% endif %}
-            {% endfor %}
-            {% for deduction in post_tax_deductions %}
-                {% if deduction.is_employer_contribution %}
-                <tr class="oh-payslip__table-tr" style="color: #d2691e;">
-                    <td class="oh-payslip__table-td">
-                        {{deduction.title}}
-                        <i style="font-style: italic; margin-left: 10px; font-weight: normal;"
-                        title="{% trans "Employer Contribution to Government" %}">
-                            <ion-icon name="information-circle-outline" style="color:orange;" role="img" class="md hydrated" aria-label="information circle outline"></ion-icon>
-                        </i>
-                    </td>
-                    <td class="oh-payslip__table-td">
-                        {{deduction.amount|floatformat:2|currency_symbol_position}}
-                    </td>
-                </tr>
-                {% endif %}
-            {% endfor %}
-            {% for deduction in tax_deductions %}
-                {% if deduction.is_employer_contribution %}
-                <tr class="oh-payslip__table-tr" style="color: #d2691e;">
-                    <td class="oh-payslip__table-td">
-                        {{deduction.title}}
-                        <i style="font-style: italic; margin-left: 10px; font-weight: normal;"
-                        title="{% trans "Employer Contribution to Government" %}">
-                            <ion-icon name="information-circle-outline" style="color:orange;" role="img" class="md hydrated" aria-label="information circle outline"></ion-icon>
-                        </i>
-                    </td>
-                    <td class="oh-payslip__table-td">
-                        {{deduction.amount|floatformat:2|currency_symbol_position}}
-                    </td>
-                </tr>
-                {% endif %}
-            {% endfor %}
-            {% for deduction in net_deductions %}
-                {% if deduction.is_employer_contribution %}
-                <tr class="oh-payslip__table-tr" style="color: #d2691e;">
-                    <td class="oh-payslip__table-td">
-                        {{deduction.title}}
-                        <i style="font-style: italic; margin-left: 10px; font-weight: normal;"
-                        title="{% trans "Employer Contribution to Government" %}">
-                            <ion-icon name="information-circle-outline" style="color:orange;" role="img" class="md hydrated" aria-label="information circle outline"></ion-icon>
-                        </i>
-                    </td>
-                    <td class="oh-payslip__table-td">
-                        {{deduction.amount|floatformat:2|currency_symbol_position}}
-                    </td>
-                </tr>
-                {% endif %}
             {% endfor %}
         </tbody>
     </table>

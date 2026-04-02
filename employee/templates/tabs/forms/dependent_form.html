@@ -1,0 +1,28 @@
+{% load i18n %}
+{% load static %}
+
+<div class="oh-modal__dialog-header">
+    <h3 class="oh-modal__dialog-title">
+        {% if dependent %}
+            {% trans "Update Dependent Details" %}
+        {% else %}
+            {% trans "Add Dependent Details" %}
+        {% endif %}
+    </h3>
+    <button type="button" class="oh-modal__close" onclick="$('#objectCreateModal').removeClass('oh-modal--show')">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+
+<div class="oh-modal__dialog-body">
+    <form method="post" enctype="multipart/form-data" class="oh-form" hx-post="{% if dependent %}{% url 'dependent-update' emp_id dependent.id %}{% else %}{% url 'dependent-create' emp_id %}{% endif %}" hx-target="#dependent_details_target">
+        {% csrf_token %}
+        {{ form.as_p }}
+    </form>
+</div>
+
+<script>
+document.body.addEventListener('closeModal', function() {
+    $('#objectCreateModal').removeClass('oh-modal--show');
+});
+</script>

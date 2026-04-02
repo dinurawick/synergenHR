@@ -1,0 +1,124 @@
+{% load i18n %} {% load static %} {% load horillafilters %}
+
+<div class="oh-card oh-card--margin">
+    <div class="oh-card__header d-flex justify-content-between align-items-center">
+        <span class="oh-card__title oh-card__title--sm fw-bold me-2">
+            {% trans "Educational Qualifications" %}
+        </span>
+        {% if perms.employee.add_employee or request.user == employee.employee_user_id %}
+            <a href="{% url 'educational-qualification-create' emp_id %}" 
+               class="oh-btn oh-btn--primary oh-btn--sm"
+               data-toggle="oh-modal-toggle"
+               data-target="#objectCreateModal"
+               hx-get="{% url 'educational-qualification-create' emp_id %}"
+               hx-target="#objectCreateModalTarget">
+                <ion-icon name="add-outline"></ion-icon>
+                {% trans "Add Qualification" %}
+            </a>
+        {% endif %}
+    </div>
+    
+    <div class="oh-card__body mt-4">
+        {% if educational_qualifications %}
+            <div class="oh-sticky-table">
+                <table class="oh-table oh-table--striped">
+                    <thead>
+                        <tr>
+                            <th>{% trans "Qualification Name" %}</th>
+                            <th>{% trans "Institute / University" %}</th>
+                            <th>{% trans "Country" %}</th>
+                            <th>{% trans "Duration" %}</th>
+                            <th>{% trans "Result / Grade" %}</th>
+                            <th>{% trans "Status" %}</th>
+                            <th>{% trans "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for qualification in educational_qualifications %}
+                            <tr>
+                                <td>{{ qualification.qualification_name }}</td>
+                                <td>{{ qualification.institute_university }}</td>
+                                <td>{{ qualification.country }}</td>
+                                <td>
+                                    {{ qualification.start_year }}
+                                    {% if qualification.end_year %}
+                                        - {{ qualification.end_year }}
+                                    {% else %}
+                                        - {% trans "Present" %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ qualification.result_grade_gpa|default:_("None") }}</td>
+                                <td>
+                                    {% if qualification.status == 'completed' %}
+                                        <span class="oh-badge oh-badge--success">{{ qualification.get_status_display }}</span>
+                                    {% elif qualification.status == 'in_progress' %}
+                                        <span class="oh-badge oh-badge--warning">{{ qualification.get_status_display }}</span>
+                                    {% else %}
+                                        <span class="oh-badge oh-badge--danger">{{ qualification.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="oh-dropdown" x-data="{open: false}">
+                                        <button class="oh-btn oh-btn--secondary oh-btn--sm oh-dropdown__toggle" 
+                                                type="button" @click="open = !open">
+                                            <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+                                        </button>
+                                        <ul class="oh-dropdown__menu" x-show="open" @click.outside="open = false">
+                                            {% if perms.employee.change_employee or request.user == employee.employee_user_id %}
+                                                <li>
+                                                    <a class="oh-dropdown__item" 
+                                                       href="{% url 'educational-qualification-update' emp_id qualification.id %}"
+                                                       data-toggle="oh-modal-toggle"
+                                                       data-target="#objectCreateModal"
+                                                       hx-get="{% url 'educational-qualification-update' emp_id qualification.id %}"
+                                                       hx-target="#objectCreateModalTarget">
+                                                        <ion-icon name="create-outline"></ion-icon>
+                                                        {% trans "Edit" %}
+                                                    </a>
+                                                </li>
+                                            {% endif %}
+                                            {% if perms.employee.delete_employee or request.user == employee.employee_user_id %}
+                                                <li>
+                                                    <a class="oh-dropdown__item oh-dropdown__item--danger delete-qualification" 
+                                                       href="{% url 'educational-qualification-delete' emp_id qualification.id %}"
+                                                       data-confirm-message="{% trans 'Are you sure you want to delete this educational qualification?' %}">
+                                                        <ion-icon name="trash-outline"></ion-icon>
+                                                        {% trans "Delete" %}
+                                                    </a>
+                                                </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="oh-not-found">
+                <div class="oh-not-found__icon">
+                    <ion-icon name="school-outline" style="font-size: 4rem; opacity: 0.3;"></ion-icon>
+                </div>
+                <h3 class="oh-not-found__title">{% trans "No Educational Qualifications Found" %}</h3>
+                <p class="oh-not-found__description">
+                    {% trans "No educational qualifications have been added for this employee yet." %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.delete-qualification').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const message = this.getAttribute('data-confirm-message');
+            if (confirm(message)) {
+                window.location.href = this.href;
+            }
+        });
+    });
+});
+</script>

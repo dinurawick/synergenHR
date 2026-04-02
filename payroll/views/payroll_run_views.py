@@ -376,7 +376,7 @@ def generate_payslips_for_approved_run(payroll_run):
                 }
                 
                 # Calculate employer contribution
-                calculate_employer_contribution(data)
+                # calculate_employer_contribution(data)  # Disabled - using new employer_contributions system
                 
                 # Save the payslip
                 payslip_instance = save_payslip(**data)

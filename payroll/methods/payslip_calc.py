@@ -9,6 +9,7 @@ import contextlib
 import operator
 
 from django.apps import apps
+from django.db.models import Q
 
 # from attendance.models import Attendance
 from horilla.methods import get_horilla_model_class
@@ -496,10 +497,17 @@ def calculate_tax_deduction(*_args, **kwargs):
         deductions.exclude(one_time_date__lt=start_date)
         .exclude(one_time_date__gt=end_date)
         .exclude(update_compensation__isnull=False)
+        .distinct()  # Remove duplicates
     )
     deductions_amt = []
     serialized_deductions = []
+    processed_deduction_ids = set()  # Track processed deductions to avoid duplicates
+    
     for deduction in deductions:
+        # Skip if we've already processed this deduction
+        if deduction.id in processed_deduction_ids:
+            continue
+        processed_deduction_ids.add(deduction.id)
         calculation_function = calculation_mapping.get(deduction.based_on)
         amount = calculation_function(
             **{
@@ -529,36 +537,7 @@ def calculate_tax_deduction(*_args, **kwargs):
         }
         serialized_deductions.append(serialized_deduction)
         
-        # Add employer contribution as separate deduction if employer_rate > 0
-        if deduction.employer_rate > 0:
-            # Calculate employer contribution based on gross pay, not employee contribution
-            # ETF should be calculated as: gross_pay * employer_rate / 100
-            gross_pay = float(kwargs.get("gross_pay", 0))
-            employer_amount = (gross_pay * float(deduction.employer_rate)) / 100
-            
-            # Add employer deduction entry (EPF)
-            employer_deduction = {
-                "deduction_id": deduction.id,
-                "title": "EPF",  # Use EPF as the title for employer contribution
-                "is_tax": deduction.is_tax,
-                "amount": employer_amount,
-                "employer_contribution_rate": 0,  # This IS the employer contribution
-                "is_employer_contribution": True,
-            }
-            serialized_deductions.append(employer_deduction)
-            
-            # Add hardcoded ETF calculation (3% of gross pay)
-            etf_amount = (gross_pay * 3.0) / 100  # Hardcoded 3% of gross pay
-            
-            etf_deduction = {
-                "deduction_id": deduction.id,
-                "title": "ETF",  # ETF calculation
-                "is_tax": deduction.is_tax,
-                "amount": etf_amount,
-                "employer_contribution_rate": 0,
-                "is_employer_contribution": True,
-            }
-            serialized_deductions.append(etf_deduction)
+        # Note: Employer contributions are now handled separately to avoid duplication
     
     return {"tax_deductions": serialized_deductions}
 
@@ -596,6 +575,7 @@ def calculate_pre_tax_deduction(*_args, **kwargs):
         deductions.exclude(one_time_date__lt=start_date)
         .exclude(one_time_date__gt=end_date)
         .exclude(update_compensation__isnull=False)
+        .distinct()  # Remove duplicates
     )
     # Installment deductions
     installments = deductions.filter(is_installment=True)
@@ -603,8 +583,14 @@ def calculate_pre_tax_deduction(*_args, **kwargs):
     pre_tax_deductions = []
     pre_tax_deductions_amt = []
     serialized_deductions = []
+    processed_deduction_ids = set()  # Track processed deductions to avoid duplicates
 
     for deduction in deductions:
+        # Skip if we've already processed this deduction
+        if deduction.id in processed_deduction_ids:
+            continue
+        processed_deduction_ids.add(deduction.id)
+        
         if deduction.is_condition_based:
             conditions = list(
                 deduction.other_conditions.values_list("field", "condition", "value")
@@ -668,36 +654,7 @@ def calculate_pre_tax_deduction(*_args, **kwargs):
         }
         serialized_deductions.append(serialized_deduction)
         
-        # Add employer contribution as separate deduction if employer_rate > 0
-        if deduction.employer_rate > 0:
-            # Calculate employer contribution based on gross pay, not employee contribution
-            # ETF should be calculated as: gross_pay * employer_rate / 100
-            gross_pay = float(kwargs.get("gross_pay", 0))
-            employer_amount = (gross_pay * float(deduction.employer_rate)) / 100
-            
-            # Add employer deduction entry (EPF)
-            employer_deduction = {
-                "deduction_id": deduction.id,
-                "title": "EPF",  # Use EPF as the title for employer contribution
-                "is_pretax": deduction.is_pretax,
-                "amount": employer_amount,
-                "employer_contribution_rate": 0,  # This IS the employer contribution
-                "is_employer_contribution": True,
-            }
-            serialized_deductions.append(employer_deduction)
-            
-            # Add hardcoded ETF calculation (3% of gross pay)
-            etf_amount = (gross_pay * 3.0) / 100  # Hardcoded 3% of gross pay
-            
-            etf_deduction = {
-                "deduction_id": deduction.id,
-                "title": "ETF",  # ETF calculation
-                "is_pretax": deduction.is_pretax,
-                "amount": etf_amount,
-                "employer_contribution_rate": 0,
-                "is_employer_contribution": True,
-            }
-            serialized_deductions.append(etf_deduction)
+        # Note: Employer contributions are now handled separately to avoid duplication
     
     return {"pretax_deductions": serialized_deductions, "installments": installments}
 
@@ -751,6 +708,7 @@ def calculate_post_tax_deduction(*_args, **kwargs):
         deductions.exclude(one_time_date__lt=start_date)
         .exclude(one_time_date__gt=end_date)
         .exclude(update_compensation__isnull=False)
+        .distinct()  # Remove duplicates
     )
     # Installment deductions
     installments = deductions.filter(is_installment=True)
@@ -759,11 +717,17 @@ def calculate_post_tax_deduction(*_args, **kwargs):
     post_tax_deductions_amt = []
     serialized_deductions = []
     serialized_net_pay_deductions = []
+    processed_deduction_ids = set()  # Track processed deductions to avoid duplicates
     
     # Dictionary to store conditional formatting amounts
     conditional_deduction_amounts = {}
 
     for deduction in deductions:
+        # Skip if we've already processed this deduction
+        if deduction.id in processed_deduction_ids:
+            continue
+        processed_deduction_ids.add(deduction.id)
+        
         # Check if deduction has individual conditional formatting rule
         if hasattr(deduction, 'use_conditional_formatting') and deduction.use_conditional_formatting and hasattr(deduction, 'conditional_formatting_rule') and deduction.conditional_formatting_rule:
             # Execute the specific rule for this deduction
@@ -831,36 +795,7 @@ def calculate_post_tax_deduction(*_args, **kwargs):
         }
         serialized_deductions.append(serialized_deduction)
         
-        # Add employer contribution as separate deduction if employer_rate > 0
-        if deduction.employer_rate > 0:
-            # Calculate employer contribution based on gross pay, not employee contribution
-            # EPF should be calculated as: gross_pay * employer_rate / 100
-            gross_pay = float(kwargs.get("gross_pay", 0))
-            employer_amount = (gross_pay * float(deduction.employer_rate)) / 100
-            
-            # Add employer deduction entry (EPF)
-            employer_deduction = {
-                "deduction_id": deduction.id,
-                "title": "EPF",  # Use EPF as the title for employer contribution
-                "is_pretax": deduction.is_pretax,
-                "amount": employer_amount,
-                "employer_contribution_rate": 0,  # This IS the employer contribution
-                "is_employer_contribution": True,
-            }
-            serialized_deductions.append(employer_deduction)
-            
-            # Add hardcoded ETF calculation (3% of gross pay)
-            etf_amount = (gross_pay * 3.0) / 100  # Hardcoded 3% of gross pay
-            
-            etf_deduction = {
-                "deduction_id": deduction.id,
-                "title": "ETF",  # ETF calculation
-                "is_pretax": deduction.is_pretax,
-                "amount": etf_amount,
-                "employer_contribution_rate": 0,
-                "is_employer_contribution": True,
-            }
-            serialized_deductions.append(etf_deduction)
+        # Note: Employer contributions are now handled separately to avoid duplication
     for deduction in post_tax_deductions:
         if deduction.based_on == "net_pay":
             serialized_net_pay_deduction = {"deduction": deduction}
@@ -889,7 +824,13 @@ def calculate_net_pay_deduction(net_pay, net_pay_deductions, **kwargs):
     serialized_net_pay_deductions = []
     deductions = [item["deduction"] for item in net_pay_deductions]
     deduction_amt = []
+    processed_deduction_ids = set()  # Track processed deductions to avoid duplicates
+    
     for deduction in deductions:
+        # Skip if we've already processed this deduction
+        if deduction.id in processed_deduction_ids:
+            continue
+        processed_deduction_ids.add(deduction.id)
         amount = calculate_based_on_net_pay(deduction, net_pay, day_dict)
         kwargs["amount"] = amount
         kwargs["component"] = deduction
@@ -908,36 +849,7 @@ def calculate_net_pay_deduction(net_pay, net_pay_deductions, **kwargs):
         net_deduction = amount + net_deduction
         serialized_net_pay_deductions.append(serialized_deduction)
         
-        # Add employer contribution as separate deduction if employer_rate > 0
-        if deduction.employer_rate > 0:
-            # Calculate employer contribution based on gross pay, not employee contribution
-            # ETF should be calculated as: gross_pay * employer_rate / 100
-            gross_pay = float(kwargs.get("gross_pay", 0))
-            employer_amount = (gross_pay * float(deduction.employer_rate)) / 100
-            
-            # Add employer deduction entry (EPF)
-            employer_deduction = {
-                "deduction_id": deduction.id,
-                "title": "EPF",  # Use EPF as the title for employer contribution
-                "is_pretax": deduction.is_pretax,
-                "amount": employer_amount,
-                "employer_contribution_rate": 0,  # This IS the employer contribution
-                "is_employer_contribution": True,
-            }
-            serialized_net_pay_deductions.append(employer_deduction)
-            
-            # Add hardcoded ETF calculation (3% of gross pay)
-            etf_amount = (gross_pay * 3.0) / 100  # Hardcoded 3% of gross pay
-            
-            etf_deduction = {
-                "deduction_id": deduction.id,
-                "title": "ETF",  # ETF calculation
-                "is_pretax": deduction.is_pretax,
-                "amount": etf_amount,
-                "employer_contribution_rate": 0,
-                "is_employer_contribution": True,
-            }
-            serialized_net_pay_deductions.append(etf_deduction)
+        # Note: Employer contributions are now handled separately to avoid duplication
             # Note: Don't add employer contribution to net_deduction as it's not deducted from employee
     
     return {
@@ -1273,3 +1185,61 @@ calculation_mapping = {
     "work_type_id": calculate_based_on_work_type,
     "children": calculate_based_on_children,
 }
+def calculate_employer_contributions(**kwargs):
+    """
+    Calculate employer contributions (EPF, ETF) separately to avoid duplication.
+    This function should be called once per payslip calculation.
+    
+    Args:
+        employee: The employee object
+        gross_pay: The gross pay amount
+        start_date: Start date of payroll period
+        end_date: End date of payroll period
+        
+    Returns:
+        dict: Dictionary containing employer contributions
+    """
+    employee = kwargs["employee"]
+    gross_pay = float(kwargs.get("gross_pay", 0))
+    
+    # Get EPF deductions specifically (deductions with titles containing "EPF")
+    epf_deductions = models.Deduction.objects.filter(
+        Q(specific_employees=employee) | 
+        Q(include_active_employees=True)
+    ).exclude(exclude_employees=employee).filter(
+        title__icontains="EPF",
+        employer_rate__gt=0
+    )
+    
+    employer_contributions = []
+    
+    # Calculate EPF employer contribution (12% typically)
+    if epf_deductions.exists():
+        # Use the first EPF deduction's employer rate (should be 12%)
+        epf_deduction = epf_deductions.first()
+        epf_employer_rate = float(epf_deduction.employer_rate)
+        epf_amount = (gross_pay * epf_employer_rate) / 100
+        
+        epf_contribution = {
+            "deduction_id": epf_deduction.id,
+            "title": "EPF",
+            "is_pretax": epf_deduction.is_pretax,
+            "amount": epf_amount,
+            "employer_contribution_rate": epf_employer_rate,
+            "is_employer_contribution": True,
+        }
+        employer_contributions.append(epf_contribution)
+        
+        # Add ETF entry (3% of gross pay) - only if there are EPF deductions
+        etf_amount = (gross_pay * 3.0) / 100  # Standard ETF rate
+        etf_contribution = {
+            "deduction_id": epf_deduction.id,
+            "title": "ETF",
+            "is_pretax": epf_deduction.is_pretax,
+            "amount": etf_amount,
+            "employer_contribution_rate": 3.0,  # Show 3% for ETF
+            "is_employer_contribution": True,
+        }
+        employer_contributions.append(etf_contribution)
+    
+    return {"employer_contributions": employer_contributions}

@@ -83,7 +83,7 @@ def generate_payslip(date, companies, all):
         data["deduction"] = payslip_data["total_deductions"]
         data["net_pay"] = payslip_data["net_pay"]
         data["pay_data"] = json.loads(payslip_data["json_data"])
-        calculate_employer_contribution(data)
+        # calculate_employer_contribution(data)  # Disabled - using new employer_contributions system
         data["installments"] = payslip_data["installments"]
         payslip_data["instance"] = save_payslip(**data)
 

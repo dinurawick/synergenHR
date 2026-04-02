@@ -452,6 +452,30 @@
 									</li>
 								{% endif %}
 							{% endif %}
+
+							{% if perms.employee.view_employee or request.user == employee.employee_user_id %}
+								<li data-cell-index="24" data-cell-title="{% trans 'Dependent Details' %}" class="oh-general__tab">
+									<a hx-get={% url 'dependent-details-tab' employee.id %} hx-target="#dependent_details_target"
+										data-action="general-tab" data-target="#dependent_details_target"
+										class="oh-general__tab-link" role="button">{% trans "Dependent Details" %}</a>
+								</li>
+							{% endif %}
+
+							{% if perms.employee.view_employee or request.user == employee.employee_user_id %}
+								<li data-cell-index="25" data-cell-title="{% trans 'Work Experience' %}" class="oh-general__tab">
+									<a hx-get={% url 'work-experience-tab' employee.id %} hx-target="#work_experience_target"
+										data-action="general-tab" data-target="#work_experience_target"
+										class="oh-general__tab-link" role="button">{% trans "Work Experience" %}</a>
+								</li>
+							{% endif %}
+
+							{% if perms.employee.view_employee or request.user == employee.employee_user_id %}
+								<li data-cell-index="26" data-cell-title="{% trans 'Educational Qualifications' %}" class="oh-general__tab">
+									<a hx-get={% url 'educational-qualifications-tab' employee.id %} hx-target="#educational_qualifications_target"
+										data-action="general-tab" data-target="#educational_qualifications_target"
+										class="oh-general__tab-link" role="button">{% trans "Educational Qualifications" %}</a>
+								</li>
+							{% endif %}
 						</ul>
 						<button
 							hx-get={% url 'bonus-points-tab' employee.id %} hx-target="#bonus_points_target" id="bonus-tab-button" hidden>
@@ -494,6 +518,12 @@
 						{% endif %}
 
 						<div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="document_target"> </div>
+
+						<div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="dependent_details_target"> </div>
+
+						<div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="work_experience_target"> </div>
+
+						<div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="educational_qualifications_target"> </div>
 
 						{% if perms.auth.view_permission or perms.auth.view_group or request.user|is_reportingmanager or request.user == employee.employee_user_id %}
 							<div class="oh-general__tab-target oh-profile__info-tab mb-4" id="permission_tab_content"></div>

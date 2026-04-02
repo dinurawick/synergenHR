@@ -1118,3 +1118,166 @@ ACCESSBILITY_FEATURE.append(("gender_chart", "Can view Gender Chart"))
 ACCESSBILITY_FEATURE.append(("department_chart", "Can view Department Chart"))
 ACCESSBILITY_FEATURE.append(("employees_chart", "Can view Employees Chart"))
 ACCESSBILITY_FEATURE.append(("birthday_view", "Can view Birthdays"))
+
+
+class EmployeeDependent(HorillaModel):
+    """
+    Employee Dependent model
+    """
+    RELATIONSHIP_CHOICES = [
+        ('spouse', trans('Spouse')),
+        ('child', trans('Child')),
+        ('parent', trans('Parent')),
+        ('sibling', trans('Sibling')),
+        ('other', trans('Other')),
+    ]
+    
+    employee_id = models.ForeignKey(
+        Employee, 
+        on_delete=models.CASCADE, 
+        related_name='dependents',
+        verbose_name=_("Employee")
+    )
+    full_name = models.CharField(max_length=200, verbose_name=_("Full Name"))
+    relationship = models.CharField(
+        max_length=20, 
+        choices=RELATIONSHIP_CHOICES, 
+        verbose_name=_("Relationship")
+    )
+    date_of_birth = models.DateField(null=True, blank=True, verbose_name=_("Date of Birth"))
+    identity_number = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True, 
+        verbose_name=_("Identity Number / Passport No")
+    )
+    insurance_covered = models.BooleanField(default=False, verbose_name=_("Insurance Covered"))
+    remarks = models.TextField(null=True, blank=True, verbose_name=_("Remarks"))
+    attachment = models.FileField(
+        upload_to=upload_path, 
+        null=True, 
+        blank=True, 
+        verbose_name=_("Attachment")
+    )
+    objects = HorillaCompanyManager("employee_id__employee_work_info__company_id")
+
+    class Meta:
+        """
+        Meta class to add additional options
+        """
+        verbose_name = _("Employee Dependent")
+        verbose_name_plural = _("Employee Dependents")
+
+    def __str__(self):
+        return f"{self.full_name} - {self.employee_id}"
+
+
+class EmployeeWorkExperience(HorillaModel):
+    """
+    Employee Work Experience model
+    """
+    EMPLOYMENT_TYPE_CHOICES = [
+        ('full_time', trans('Full Time')),
+        ('part_time', trans('Part Time')),
+        ('contract', trans('Contract')),
+        ('internship', trans('Internship')),
+        ('freelance', trans('Freelance')),
+    ]
+    
+    employee_id = models.ForeignKey(
+        Employee, 
+        on_delete=models.CASCADE, 
+        related_name='work_experiences',
+        verbose_name=_("Employee")
+    )
+    company_name = models.CharField(max_length=200, verbose_name=_("Company Name"))
+    job_title = models.CharField(max_length=200, verbose_name=_("Job Title"))
+    employment_type = models.CharField(
+        max_length=20, 
+        choices=EMPLOYMENT_TYPE_CHOICES, 
+        verbose_name=_("Employment Type")
+    )
+    start_date = models.DateField(verbose_name=_("Start Date"))
+    end_date = models.DateField(null=True, blank=True, verbose_name=_("End Date"))
+    reason_for_leaving = models.CharField(
+        max_length=200, 
+        null=True, 
+        blank=True, 
+        verbose_name=_("Reason for Leaving")
+    )
+    remarks = models.TextField(null=True, blank=True, verbose_name=_("Remarks"))
+    attachment = models.FileField(
+        upload_to=upload_path, 
+        null=True, 
+        blank=True, 
+        verbose_name=_("Attachment")
+    )
+    objects = HorillaCompanyManager("employee_id__employee_work_info__company_id")
+
+    class Meta:
+        """
+        Meta class to add additional options
+        """
+        verbose_name = _("Employee Work Experience")
+        verbose_name_plural = _("Employee Work Experiences")
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f"{self.job_title} at {self.company_name} - {self.employee_id}"
+
+
+class EmployeeEducationalQualification(HorillaModel):
+    """
+    Employee Educational Qualification model
+    """
+    STATUS_CHOICES = [
+        ('completed', trans('Completed')),
+        ('in_progress', trans('In Progress')),
+        ('discontinued', trans('Discontinued')),
+    ]
+    
+    employee_id = models.ForeignKey(
+        Employee, 
+        on_delete=models.CASCADE, 
+        related_name='educational_qualifications',
+        verbose_name=_("Employee")
+    )
+    qualification_name = models.CharField(max_length=200, verbose_name=_("Qualification Name"))
+    institute_university = models.CharField(
+        max_length=200, 
+        verbose_name=_("Institute / University")
+    )
+    country = models.CharField(max_length=100, verbose_name=_("Country"))
+    start_year = models.IntegerField(verbose_name=_("Start Year"))
+    end_year = models.IntegerField(null=True, blank=True, verbose_name=_("End Year"))
+    result_grade_gpa = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True, 
+        verbose_name=_("Result / Grade / GPA")
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='completed',
+        verbose_name=_("Status")
+    )
+    attachment = models.FileField(
+        upload_to=upload_path, 
+        null=True, 
+        blank=True, 
+        verbose_name=_("Attachment")
+    )
+    remarks = models.TextField(null=True, blank=True, verbose_name=_("Remarks"))
+    objects = HorillaCompanyManager("employee_id__employee_work_info__company_id")
+
+    class Meta:
+        """
+        Meta class to add additional options
+        """
+        verbose_name = _("Employee Educational Qualification")
+        verbose_name_plural = _("Employee Educational Qualifications")
+        ordering = ['-start_year']
+
+    def __str__(self):
+        return f"{self.qualification_name} - {self.employee_id}"

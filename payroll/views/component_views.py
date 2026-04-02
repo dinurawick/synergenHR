@@ -73,6 +73,7 @@ from payroll.methods.payslip_calc import (
     calculate_pre_tax_deduction,
     calculate_tax_deduction,
     calculate_taxable_gross_pay,
+    calculate_employer_contributions,
 )
 from payroll.methods.tax_calc import calculate_taxable_amount
 from payroll.models.models import (
@@ -174,15 +175,15 @@ def payroll_calculation(employee, start_date, end_date):
     total_allowance = sum(item["amount"] for item in allowances["allowances"])
     total_pretax_deduction = sum(
         item["amount"] for item in pretax_deductions["pretax_deductions"]
-        if not item.get("is_employer_contribution", False)  # Exclude ETF
+        if not item.get("is_employer_contribution", False) and not item.get("employer_contribution_amount")
     )
     total_post_tax_deduction = sum(
         item["amount"] for item in post_tax_deductions["post_tax_deductions"]
-        if not item.get("is_employer_contribution", False)  # Exclude ETF
+        if not item.get("is_employer_contribution", False) and not item.get("employer_contribution_amount")
     )
     total_tax_deductions = sum(
         item["amount"] for item in tax_deductions["tax_deductions"]
-        if not item.get("is_employer_contribution", False)  # Exclude ETF
+        if not item.get("is_employer_contribution", False) and not item.get("employer_contribution_amount")
     )
 
     total_deductions = (
@@ -227,9 +228,12 @@ def payroll_calculation(employee, start_date, end_date):
     total_net_pay_deductions = sum(
         item.get("amount", 0) for item in net_pay_deduction_list 
         if isinstance(item.get("amount"), (int, float)) and item.get("amount") is not None
-        and not item.get("is_employer_contribution", False)  # Exclude ETF
+        and not item.get("is_employer_contribution", False) and not item.get("employer_contribution_amount")
     )
     total_deductions = total_deductions + total_net_pay_deductions
+    
+    # Calculate employer contributions separately to avoid duplication
+    employer_contributions = calculate_employer_contributions(**kwargs)
     
     payslip_data = {
         "employee": employee,
@@ -247,6 +251,7 @@ def payroll_calculation(employee, start_date, end_date):
         "post_tax_deductions": post_tax_deductions["post_tax_deductions"],
         "tax_deductions": tax_deductions["tax_deductions"],
         "net_deductions": net_pay_deduction_list,
+        "employer_contributions": employer_contributions["employer_contributions"],
         "total_deductions": total_deductions,
         "loss_of_pay": loss_of_pay,
         "federal_tax": federal_tax,
@@ -807,7 +812,7 @@ def generate_payslip(request):
                 data["deduction"] = payslip["total_deductions"]
                 data["net_pay"] = payslip["net_pay"]
                 data["pay_data"] = json.loads(payslip["json_data"])
-                calculate_employer_contribution(data)
+                # calculate_employer_contribution(data)  # Disabled - using new employer_contributions system
                 data["installments"] = payslip["installments"]
                 data["payroll_run"] = payroll_run  # Add payroll run
                 instance = save_payslip(**data)
@@ -956,7 +961,7 @@ def create_payslip(request, new_post_data=None):
                 data["deduction"] = payslip_data["total_deductions"]
                 data["net_pay"] = payslip_data["net_pay"]
                 data["pay_data"] = json.loads(payslip_data["json_data"])
-                calculate_employer_contribution(data)
+                # calculate_employer_contribution(data)  # Disabled - using new employer_contributions system
                 data["installments"] = payslip_data["installments"]
                 data["payroll_run"] = payroll_run  # Add payroll run to data
                 payslip_data["instance"] = save_payslip(**data)

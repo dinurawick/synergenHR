@@ -1,0 +1,28 @@
+{% load i18n %}
+{% load static %}
+
+<div class="oh-modal__dialog-header">
+    <h3 class="oh-modal__dialog-title">
+        {% if qualification %}
+            {% trans "Update Educational Qualification" %}
+        {% else %}
+            {% trans "Add Educational Qualification" %}
+        {% endif %}
+    </h3>
+    <button type="button" class="oh-modal__close" onclick="$('#objectCreateModal').removeClass('oh-modal--show')">
+        <ion-icon name="close-outline"></ion-icon>
+    </button>
+</div>
+
+<div class="oh-modal__dialog-body">
+    <form method="post" enctype="multipart/form-data" class="oh-form" hx-post="{% if qualification %}{% url 'educational-qualification-update' emp_id qualification.id %}{% else %}{% url 'educational-qualification-create' emp_id %}{% endif %}" hx-target="#educational_qualifications_target">
+        {% csrf_token %}
+        {{ form.as_p }}
+    </form>
+</div>
+
+<script>
+document.body.addEventListener('closeModal', function() {
+    $('#objectCreateModal').removeClass('oh-modal--show');
+});
+</script>

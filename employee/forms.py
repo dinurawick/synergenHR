@@ -43,9 +43,12 @@ from employee.models import (
     DisciplinaryAction,
     Employee,
     EmployeeBankDetails,
+    EmployeeDependent,
+    EmployeeEducationalQualification,
     EmployeeGeneralSetting,
     EmployeeNote,
     EmployeeTag,
+    EmployeeWorkExperience,
     EmployeeWorkInformation,
     NoteFiles,
     Policy,
@@ -910,3 +913,112 @@ class BankBranchForm(ModelForm):
         self.fields["bank_code_1"].widget.attrs["placeholder"] = _("Enter primary bank code")
         self.fields["bank_code_2"].widget.attrs["placeholder"] = _("Enter secondary bank code (optional)")
         self.fields["bank_code_2"].required = False
+
+
+class EmployeeDependentForm(ModelForm):
+    """
+    Form for EmployeeDependent model
+    """
+
+    class Meta:
+        model = EmployeeDependent
+        fields = "__all__"
+        exclude = ("employee_id",)
+        widgets = {
+            "full_name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "relationship": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "date_of_birth": forms.DateInput(attrs={"class": "oh-input w-100", "type": "date"}),
+            "identity_number": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "insurance_covered": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
+            "remarks": forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+            "attachment": forms.FileInput(attrs={"class": "oh-input w-100"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields:
+            if field not in ["insurance_covered", "attachment"]:
+                self.fields[field].widget.attrs["placeholder"] = self.fields[field].label
+
+    def as_p(self, *args, **kwargs):
+        """
+        Render the form fields using the horilla form template.
+        """
+        from django.template.loader import render_to_string
+        context = {"form": self}
+        return render_to_string("horilla_form.html", context)
+
+
+class EmployeeWorkExperienceForm(ModelForm):
+    """
+    Form for EmployeeWorkExperience model
+    """
+
+    class Meta:
+        model = EmployeeWorkExperience
+        fields = "__all__"
+        exclude = ("employee_id",)
+        widgets = {
+            "company_name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "job_title": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "employment_type": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "start_date": forms.DateInput(attrs={"class": "oh-input w-100", "type": "date"}),
+            "end_date": forms.DateInput(attrs={"class": "oh-input w-100", "type": "date"}),
+            "reason_for_leaving": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "remarks": forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+            "attachment": forms.FileInput(attrs={"class": "oh-input w-100"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["end_date"].required = False
+        self.fields["reason_for_leaving"].required = False
+        for field in self.fields:
+            if field not in ["attachment"]:
+                self.fields[field].widget.attrs["placeholder"] = self.fields[field].label
+
+    def as_p(self, *args, **kwargs):
+        """
+        Render the form fields using the horilla form template.
+        """
+        from django.template.loader import render_to_string
+        context = {"form": self}
+        return render_to_string("horilla_form.html", context)
+
+
+class EmployeeEducationalQualificationForm(ModelForm):
+    """
+    Form for EmployeeEducationalQualification model
+    """
+
+    class Meta:
+        model = EmployeeEducationalQualification
+        fields = "__all__"
+        exclude = ("employee_id",)
+        widgets = {
+            "qualification_name": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "institute_university": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "country": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "start_year": forms.NumberInput(attrs={"class": "oh-input w-100"}),
+            "end_year": forms.NumberInput(attrs={"class": "oh-input w-100"}),
+            "result_grade_gpa": forms.TextInput(attrs={"class": "oh-input w-100"}),
+            "status": forms.Select(attrs={"class": "oh-select oh-select-2 w-100"}),
+            "attachment": forms.FileInput(attrs={"class": "oh-input w-100"}),
+            "remarks": forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["end_year"].required = False
+        self.fields["result_grade_gpa"].required = False
+        for field in self.fields:
+            if field not in ["attachment"]:
+                self.fields[field].widget.attrs["placeholder"] = self.fields[field].label
+
+    def as_p(self, *args, **kwargs):
+        """
+        Render the form fields using the horilla form template.
+        """
+        from django.template.loader import render_to_string
+        context = {"form": self}
+        return render_to_string("horilla_form.html", context)

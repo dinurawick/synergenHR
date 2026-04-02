@@ -72,11 +72,14 @@ from employee.forms import (
     BulkUpdateFieldForm,
     EmployeeBankDetailsForm,
     EmployeeBankDetailsUpdateForm,
+    EmployeeDependentForm,
+    EmployeeEducationalQualificationForm,
     EmployeeExportExcelForm,
     EmployeeForm,
     EmployeeGeneralSettingPrefixForm,
     EmployeeNoteForm,
     EmployeeTagForm,
+    EmployeeWorkExperienceForm,
     EmployeeWorkInformationForm,
     EmployeeWorkInformationUpdateForm,
     excel_columns,
@@ -101,9 +104,12 @@ from employee.models import (
     BonusPoint,
     Employee,
     EmployeeBankDetails,
+    EmployeeDependent,
+    EmployeeEducationalQualification,
     EmployeeGeneralSetting,
     EmployeeNote,
     EmployeeTag,
+    EmployeeWorkExperience,
     EmployeeWorkInformation,
     NoteFiles,
 )
@@ -3252,6 +3258,286 @@ def bonus_points_tab(request, emp_id):
         "tabs/bonus_points.html",
         context,
     )
+
+
+@login_required
+@hx_request_required
+@owner_can_enter("employee.view_employee", Employee)
+def dependent_details_tab(request, emp_id):
+    """
+    This function is used to view dependent details tab of an employee in employee individual
+    & profile view.
+
+    Parameters:
+    request (HttpRequest): The HTTP request object.
+    emp_id (int): The id of the employee.
+
+    Returns: return dependent_details template
+    """
+    employee = Employee.objects.get(id=emp_id)
+    dependents = EmployeeDependent.objects.filter(employee_id=emp_id)
+    dependents_ids = json.dumps([instance.id for instance in dependents])
+    
+    context = {
+        "employee": employee,
+        "dependents": dependents,
+        "dependents_ids": dependents_ids,
+        "emp_id": emp_id,
+    }
+    return render(request, "tabs/dependent_details_tab.html", context=context)
+
+
+@login_required
+@hx_request_required
+@owner_can_enter("employee.view_employee", Employee)
+def work_experience_tab(request, emp_id):
+    """
+    This function is used to view work experience tab of an employee in employee individual
+    & profile view.
+
+    Parameters:
+    request (HttpRequest): The HTTP request object.
+    emp_id (int): The id of the employee.
+
+    Returns: return work_experience template
+    """
+    employee = Employee.objects.get(id=emp_id)
+    work_experiences = EmployeeWorkExperience.objects.filter(employee_id=emp_id)
+    work_experiences_ids = json.dumps([instance.id for instance in work_experiences])
+    
+    context = {
+        "employee": employee,
+        "work_experiences": work_experiences,
+        "work_experiences_ids": work_experiences_ids,
+        "emp_id": emp_id,
+    }
+    return render(request, "tabs/work_experience_tab.html", context=context)
+
+
+@login_required
+@hx_request_required
+@owner_can_enter("employee.view_employee", Employee)
+def educational_qualifications_tab(request, emp_id):
+    """
+    This function is used to view educational qualifications tab of an employee in employee individual
+    & profile view.
+
+    Parameters:
+    request (HttpRequest): The HTTP request object.
+    emp_id (int): The id of the employee.
+
+    Returns: return educational_qualifications template
+    """
+    employee = Employee.objects.get(id=emp_id)
+    educational_qualifications = EmployeeEducationalQualification.objects.filter(employee_id=emp_id)
+    educational_qualifications_ids = json.dumps([instance.id for instance in educational_qualifications])
+    
+    context = {
+        "employee": employee,
+        "educational_qualifications": educational_qualifications,
+        "educational_qualifications_ids": educational_qualifications_ids,
+        "emp_id": emp_id,
+    }
+    return render(request, "tabs/educational_qualifications_tab.html", context=context)
+
+
+# Dependent Details CRUD Views
+@login_required
+@owner_can_enter("employee.add_employee", Employee)
+def dependent_create(request, emp_id):
+    """
+    This function is used to create dependent details for an employee
+    """
+    employee = Employee.objects.get(id=emp_id)
+    form = EmployeeDependentForm()
+    if request.method == "POST":
+        form = EmployeeDependentForm(request.POST, request.FILES)
+        if form.is_valid():
+            dependent = form.save(commit=False)
+            dependent.employee_id = employee
+            dependent.save()
+            messages.success(request, _("Dependent details added successfully"))
+            # Return HTMX response to refresh the tab and close modal
+            response = render(request, "tabs/dependent_details_tab.html", {
+                "employee": employee,
+                "dependents": EmployeeDependent.objects.filter(employee_id=emp_id),
+                "dependents_ids": json.dumps([instance.id for instance in EmployeeDependent.objects.filter(employee_id=emp_id)]),
+                "emp_id": emp_id,
+            })
+            response['HX-Trigger'] = 'closeModal'
+            return response
+    
+    return render(request, "tabs/forms/dependent_form.html", {
+        "form": form,
+        "employee": employee,
+        "emp_id": emp_id,
+    })
+
+
+@login_required
+@owner_can_enter("employee.change_employee", Employee)
+def dependent_update(request, emp_id, dependent_id):
+    """
+    This function is used to update dependent details for an employee
+    """
+    employee = Employee.objects.get(id=emp_id)
+    dependent = EmployeeDependent.objects.get(id=dependent_id)
+    form = EmployeeDependentForm(instance=dependent)
+    if request.method == "POST":
+        form = EmployeeDependentForm(request.POST, request.FILES, instance=dependent)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Dependent details updated successfully"))
+            # Return HTMX response to refresh the tab and close modal
+            response = render(request, "tabs/dependent_details_tab.html", {
+                "employee": employee,
+                "dependents": EmployeeDependent.objects.filter(employee_id=emp_id),
+                "dependents_ids": json.dumps([instance.id for instance in EmployeeDependent.objects.filter(employee_id=emp_id)]),
+                "emp_id": emp_id,
+            })
+            response['HX-Trigger'] = 'closeModal'
+            return response
+    
+    return render(request, "tabs/forms/dependent_form.html", {
+        "form": form,
+        "employee": employee,
+        "emp_id": emp_id,
+        "dependent": dependent,
+    })
+
+
+@login_required
+@owner_can_enter("employee.delete_employee", Employee)
+def dependent_delete(request, emp_id, dependent_id):
+    """
+    This function is used to delete dependent details for an employee
+    """
+    dependent = EmployeeDependent.objects.get(id=dependent_id)
+    dependent.delete()
+    messages.success(request, _("Dependent details deleted successfully"))
+    return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
+
+
+# Work Experience CRUD Views
+@login_required
+@owner_can_enter("employee.add_employee", Employee)
+def work_experience_create(request, emp_id):
+    """
+    This function is used to create work experience for an employee
+    """
+    employee = Employee.objects.get(id=emp_id)
+    form = EmployeeWorkExperienceForm()
+    if request.method == "POST":
+        form = EmployeeWorkExperienceForm(request.POST, request.FILES)
+        if form.is_valid():
+            work_experience = form.save(commit=False)
+            work_experience.employee_id = employee
+            work_experience.save()
+            messages.success(request, _("Work experience added successfully"))
+            return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
+    
+    return render(request, "tabs/forms/work_experience_form.html", {
+        "form": form,
+        "employee": employee,
+        "emp_id": emp_id,
+    })
+
+
+@login_required
+@owner_can_enter("employee.change_employee", Employee)
+def work_experience_update(request, emp_id, experience_id):
+    """
+    This function is used to update work experience for an employee
+    """
+    employee = Employee.objects.get(id=emp_id)
+    work_experience = EmployeeWorkExperience.objects.get(id=experience_id)
+    form = EmployeeWorkExperienceForm(instance=work_experience)
+    if request.method == "POST":
+        form = EmployeeWorkExperienceForm(request.POST, request.FILES, instance=work_experience)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Work experience updated successfully"))
+            return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
+    
+    return render(request, "tabs/forms/work_experience_form.html", {
+        "form": form,
+        "employee": employee,
+        "emp_id": emp_id,
+        "work_experience": work_experience,
+    })
+
+
+@login_required
+@owner_can_enter("employee.delete_employee", Employee)
+def work_experience_delete(request, emp_id, experience_id):
+    """
+    This function is used to delete work experience for an employee
+    """
+    work_experience = EmployeeWorkExperience.objects.get(id=experience_id)
+    work_experience.delete()
+    messages.success(request, _("Work experience deleted successfully"))
+    return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
+
+
+# Educational Qualifications CRUD Views
+@login_required
+@owner_can_enter("employee.add_employee", Employee)
+def educational_qualification_create(request, emp_id):
+    """
+    This function is used to create educational qualification for an employee
+    """
+    employee = Employee.objects.get(id=emp_id)
+    form = EmployeeEducationalQualificationForm()
+    if request.method == "POST":
+        form = EmployeeEducationalQualificationForm(request.POST, request.FILES)
+        if form.is_valid():
+            qualification = form.save(commit=False)
+            qualification.employee_id = employee
+            qualification.save()
+            messages.success(request, _("Educational qualification added successfully"))
+            return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
+    
+    return render(request, "tabs/forms/educational_qualification_form.html", {
+        "form": form,
+        "employee": employee,
+        "emp_id": emp_id,
+    })
+
+
+@login_required
+@owner_can_enter("employee.change_employee", Employee)
+def educational_qualification_update(request, emp_id, qualification_id):
+    """
+    This function is used to update educational qualification for an employee
+    """
+    employee = Employee.objects.get(id=emp_id)
+    qualification = EmployeeEducationalQualification.objects.get(id=qualification_id)
+    form = EmployeeEducationalQualificationForm(instance=qualification)
+    if request.method == "POST":
+        form = EmployeeEducationalQualificationForm(request.POST, request.FILES, instance=qualification)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Educational qualification updated successfully"))
+            return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
+    
+    return render(request, "tabs/forms/educational_qualification_form.html", {
+        "form": form,
+        "employee": employee,
+        "emp_id": emp_id,
+        "qualification": qualification,
+    })
+
+
+@login_required
+@owner_can_enter("employee.delete_employee", Employee)
+def educational_qualification_delete(request, emp_id, qualification_id):
+    """
+    This function is used to delete educational qualification for an employee
+    """
+    qualification = EmployeeEducationalQualification.objects.get(id=qualification_id)
+    qualification.delete()
+    messages.success(request, _("Educational qualification deleted successfully"))
+    return HttpResponseRedirect(request.META.get("HTTP_REFERER", "/"))
 
 
 @login_required

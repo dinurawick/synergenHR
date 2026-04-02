@@ -33,8 +33,9 @@ def update_compensation_deduction(
             amount = compensation_amount * employee_rate / 100
         compensation_amount = compensation_amount - float(amount)
         employer_contribution_amount = 0
-        if max(0, deduction.employer_rate) and amount is not None:
-            employer_contribution_amount = (float(amount) * float(deduction.employer_rate)) / 100
+        # Employer contributions are now handled separately in calculate_employer_contributions()
+        # if max(0, deduction.employer_rate) and amount is not None:
+        #     employer_contribution_amount = (float(amount) * float(deduction.employer_rate)) / 100
         deductions.append(
             {
                 "deduction_id": deduction.id,
