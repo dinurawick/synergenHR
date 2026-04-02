@@ -5502,3 +5502,281 @@ def leave_allocation_approve(request):
             # "current_date":date.today(),
         },
     )
+
+
+# ──────────────────────────────────────────────
+# LEAVE PLANNER VIEWS
+# ──────────────────────────────────────────────
+
+@login_required
+def leave_planner_view(request):
+    """
+    Employee's own leave planner — shows calendar with all plans marked + list below.
+    """
+    employee = request.user.employee_get
+    plans = LeavePlan.objects.filter(employee_id=employee).order_by("start_date")
+
+    # Build plans JSON for the calendar
+    plans_json = json.dumps([
+        {
+            "id": p.id,
+            "start": p.start_date.isoformat(),
+            "end": p.end_date.isoformat(),
+            "leave_type": str(p.leave_type_id),
+            "status": p.status,
+            "note": p.note or "",
+        }
+        for p in plans
+    ])
+
+    return render(request, "leave/planner/planner_view.html", {
+        "plans": plans,
+        "employee": employee,
+        "plans_json": plans_json,
+    })
+
+
+@login_required
+def leave_planner_balance_api(request):
+    """
+    AJAX: returns balance for a given leave type for the logged-in employee.
+    Also returns existing plan date ranges so the calendar can mark them.
+    """
+    employee = request.user.employee_get
+    leave_type_id = request.GET.get("leave_type_id")
+    exclude_plan_id = request.GET.get("exclude_plan_id")
+
+    balance = {"available": 0, "carryforward": 0, "total": 0}
+    if leave_type_id:
+        try:
+            al = AvailableLeave.objects.get(
+                employee_id=employee, leave_type_id=leave_type_id
+            )
+            balance = {
+                "available": float(al.available_days),
+                "carryforward": float(al.carryforward_days),
+                "total": float(al.total_leave_days),
+            }
+        except AvailableLeave.DoesNotExist:
+            pass
+
+    # Existing plans for this employee (to show on calendar)
+    plans_qs = LeavePlan.objects.filter(employee_id=employee).exclude(status="rejected")
+    if exclude_plan_id:
+        plans_qs = plans_qs.exclude(id=exclude_plan_id)
+    existing_plans = [
+        {
+            "id": p.id,
+            "start": p.start_date.isoformat(),
+            "end": p.end_date.isoformat(),
+            "leave_type": str(p.leave_type_id),
+            "status": p.status,
+        }
+        for p in plans_qs
+    ]
+
+    return JsonResponse({"balance": balance, "existing_plans": existing_plans})
+
+
+@login_required
+def leave_planner_create(request):
+    """
+    Create a new leave plan (status = pending).
+    """
+    employee = request.user.employee_get
+    leave_balances = AvailableLeave.objects.filter(employee_id=employee).select_related("leave_type_id")
+
+    # Build leave type list with balances for JS
+    leave_types_json = json.dumps([
+        {
+            "id": al.leave_type_id.id,
+            "name": al.leave_type_id.name,
+            "available": float(al.available_days),
+            "carryforward": float(al.carryforward_days),
+            "total": float(al.total_leave_days),
+        }
+        for al in leave_balances
+    ])
+
+    if request.method == "POST":
+        form = LeavePlanForm(request.POST, employee=employee)
+        if form.is_valid():
+            plan = form.save(commit=False)
+            plan.employee_id = employee
+            plan.status = "pending"
+            plan.save()
+            messages.success(request, _("Leave plan submitted successfully."))
+            return redirect("leave-planner-view")
+    else:
+        form = LeavePlanForm(employee=employee)
+
+    # Existing plans for calendar display
+    existing_plans = list(
+        LeavePlan.objects.filter(employee_id=employee)
+        .exclude(status="rejected")
+        .values("id", "start_date", "end_date", "status")
+        .order_by("start_date")
+    )
+    for p in existing_plans:
+        p["start_date"] = p["start_date"].isoformat()
+        p["end_date"] = p["end_date"].isoformat()
+
+    return render(request, "leave/planner/planner_calendar.html", {
+        "form": form,
+        "title": _("Create Leave Plan"),
+        "leave_balances": leave_balances,
+        "leave_types_json": leave_types_json,
+        "existing_plans_json": json.dumps(existing_plans),
+        "balance_api_url": "/leave/planner/balance/",
+    })
+
+
+@login_required
+def leave_planner_update(request, plan_id):
+    """
+    Update a pending leave plan. Approved plans cannot be edited.
+    """
+    employee = request.user.employee_get
+    plan = get_object_or_404(LeavePlan, id=plan_id, employee_id=employee)
+    leave_balances = AvailableLeave.objects.filter(employee_id=employee).select_related("leave_type_id")
+    if plan.status != "pending":
+        messages.warning(request, _("Only pending plans can be edited."))
+        return redirect("leave-planner-view")
+    if request.method == "POST":
+        form = LeavePlanForm(request.POST, instance=plan, employee=employee)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Leave plan updated."))
+            return redirect("leave-planner-view")
+    else:
+        form = LeavePlanForm(instance=plan, employee=employee)
+
+    leave_types_json = json.dumps([
+        {
+            "id": al.leave_type_id.id,
+            "name": al.leave_type_id.name,
+            "available": float(al.available_days),
+            "carryforward": float(al.carryforward_days),
+            "total": float(al.total_leave_days),
+        }
+        for al in leave_balances
+    ])
+    existing_plans = list(
+        LeavePlan.objects.filter(employee_id=employee)
+        .exclude(status="rejected")
+        .exclude(id=plan_id)
+        .values("id", "start_date", "end_date", "status")
+        .order_by("start_date")
+    )
+    for p in existing_plans:
+        p["start_date"] = p["start_date"].isoformat()
+        p["end_date"] = p["end_date"].isoformat()
+
+    return render(request, "leave/planner/planner_calendar.html", {
+        "form": form,
+        "plan": plan,
+        "title": _("Update Leave Plan"),
+        "leave_balances": leave_balances,
+        "leave_types_json": leave_types_json,
+        "existing_plans_json": json.dumps(existing_plans),
+        "balance_api_url": "/leave/planner/balance/",
+        "edit_start": plan.start_date.isoformat(),
+        "edit_end": plan.end_date.isoformat(),
+        "edit_leave_type_id": plan.leave_type_id.id,
+    })
+
+
+@login_required
+def leave_planner_delete(request, plan_id):
+    """
+    Delete a pending or rejected leave plan.
+    """
+    employee = request.user.employee_get
+    plan = get_object_or_404(LeavePlan, id=plan_id, employee_id=employee)
+    if plan.status == "approved":
+        messages.warning(request, _("Approved plans cannot be deleted."))
+    else:
+        plan.delete()
+        messages.success(request, _("Leave plan deleted."))
+    return redirect("leave-planner-view")
+
+
+@login_required
+def manager_leave_planner_view(request):
+    """
+    Manager's view — pending plans at top, full history at bottom.
+    """
+    manager_employee = request.user.employee_get
+    subordinates = Employee.objects.filter(
+        employee_work_info__reporting_manager_id=manager_employee,
+        is_active=True,
+    )
+    # Pending only for the top section
+    plans = LeavePlan.objects.filter(
+        employee_id__in=subordinates, status="pending"
+    ).order_by("start_date")
+    # All plans for history section
+    all_plans = LeavePlan.objects.filter(
+        employee_id__in=subordinates
+    ).order_by("-id")
+    return render(request, "leave/planner/manager_view.html", {
+        "plans": plans,
+        "all_plans": all_plans,
+        "subordinates": subordinates,
+    })
+
+
+@login_required
+def leave_planner_approve(request, plan_id):
+    """
+    Manager approves a leave plan.
+    """
+    manager_employee = request.user.employee_get
+    plan = get_object_or_404(LeavePlan, id=plan_id)
+    # Verify the approver is the employee's reporting manager
+    reporting_manager = getattr(
+        getattr(plan.employee_id, "employee_work_info", None),
+        "reporting_manager_id",
+        None,
+    )
+    if reporting_manager != manager_employee and not request.user.has_perm("leave.change_leaveplan"):
+        messages.error(request, _("You are not authorised to approve this plan."))
+        return redirect("manager-leave-planner-view")
+    plan.status = "approved"
+    plan.approved_by = manager_employee
+    plan.reject_reason = ""
+    plan.save()
+    messages.success(request, _("Leave plan approved."))
+    return redirect("manager-leave-planner-view")
+
+
+@login_required
+def leave_planner_reject(request, plan_id):
+    """
+    Manager rejects a leave plan with an optional reason.
+    """
+    manager_employee = request.user.employee_get
+    plan = get_object_or_404(LeavePlan, id=plan_id)
+    reporting_manager = getattr(
+        getattr(plan.employee_id, "employee_work_info", None),
+        "reporting_manager_id",
+        None,
+    )
+    if reporting_manager != manager_employee and not request.user.has_perm("leave.change_leaveplan"):
+        messages.error(request, _("You are not authorised to reject this plan."))
+        return redirect("manager-leave-planner-view")
+    if request.method == "POST":
+        form = LeavePlanRejectForm(request.POST)
+        if form.is_valid():
+            plan.status = "rejected"
+            plan.approved_by = manager_employee
+            plan.reject_reason = form.cleaned_data.get("reject_reason", "")
+            plan.save()
+            messages.success(request, _("Leave plan rejected."))
+            return redirect("manager-leave-planner-view")
+    else:
+        form = LeavePlanRejectForm()
+    return render(request, "leave/planner/reject_form.html", {
+        "form": form,
+        "plan": plan,
+    })

@@ -48,7 +48,15 @@
         'data': datascource,
         'visibleLevel': 2,
         'nodeContent': 'title',
-        'direction': 'l2r'
+        'nodeTemplate': function(data) {
+            return '<div class="oh-org-node">'
+                + '<img src="' + (data.img || '') + '" alt="' + data.name + '" '
+                + 'style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 6px;" '
+                + 'onerror="this.src=\'/static/images/ui/default_avatar.jpg\'">'
+                + '<div class="title">' + data.name + '</div>'
+                + '<div class="content">' + (data.title || '') + '</div>'
+                + '</div>';
+        }
     });
     $('#key-word').on('keyup', function (event) {
         if (event.which === 13) {

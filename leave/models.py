@@ -1628,3 +1628,73 @@ if apps.is_installed("attendance"):
 
 #     thread = threading.Thread(target=update_leaves)
 #     thread.start()
+
+
+LEAVE_PLAN_STATUS = (
+    ("pending", _("Pending")),
+    ("approved", _("Approved")),
+    ("rejected", _("Rejected")),
+)
+
+
+class LeavePlan(HorillaModel):
+    """
+    LeavePlan model — employees plan their upcoming leave; managers approve/reject.
+    """
+
+    employee_id = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="leave_plans",
+        verbose_name=_("Employee"),
+    )
+    leave_type_id = models.ForeignKey(
+        LeaveType,
+        on_delete=models.PROTECT,
+        verbose_name=_("Leave Type"),
+    )
+    start_date = models.DateField(verbose_name=_("Start Date"))
+    end_date = models.DateField(verbose_name=_("End Date"))
+    note = models.TextField(blank=True, null=True, verbose_name=_("Note"))
+    status = models.CharField(
+        max_length=20,
+        choices=LEAVE_PLAN_STATUS,
+        default="pending",
+        verbose_name=_("Status"),
+    )
+    reject_reason = models.TextField(
+        blank=True, null=True, verbose_name=_("Reject Reason")
+    )
+    approved_by = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_leave_plans",
+        verbose_name=_("Approved/Rejected By"),
+    )
+    objects = HorillaCompanyManager(
+        related_company_field="employee_id__employee_work_info__company_id"
+    )
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = "Leave Plan"
+        verbose_name_plural = "Leave Plans"
+
+    def __str__(self):
+        return f"{self.employee_id} | {self.leave_type_id} | {self.start_date} - {self.end_date}"
+
+    @property
+    def duration_days(self):
+        if self.start_date and self.end_date:
+            return (self.end_date - self.start_date).days + 1
+        return 0
+
+    @property
+    def can_edit(self):
+        return self.status == "pending"
+
+    @property
+    def can_delete(self):
+        return self.status in ("pending", "rejected")

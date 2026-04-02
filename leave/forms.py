@@ -1263,3 +1263,75 @@ if apps.is_installed("attendance"):
 
             model = CompensatoryLeaverequestComment
             fields = ("comment",)
+
+
+class LeavePlanForm(ConditionForm):
+    """
+    Form for creating/updating a leave plan.
+    Leave type is filtered to only types assigned to the employee.
+    """
+
+    class Meta:
+        model = apps.get_model("leave", "LeavePlan")
+        fields = ["leave_type_id", "start_date", "end_date", "note"]
+
+    def __init__(self, *args, employee=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.employee = employee
+        if employee:
+            assigned_types = AvailableLeave.objects.filter(
+                employee_id=employee
+            ).values_list("leave_type_id", flat=True)
+            self.fields["leave_type_id"].queryset = LeaveType.objects.filter(
+                id__in=assigned_types
+            )
+        self.fields["leave_type_id"].label = _("Leave Type")
+        self.fields["start_date"].label = _("Start Date")
+        self.fields["end_date"].label = _("End Date")
+        self.fields["note"].label = _("Note")
+        self.fields["note"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_date")
+        end = cleaned_data.get("end_date")
+        leave_type = cleaned_data.get("leave_type_id")
+
+        if start and end and end < start:
+            raise forms.ValidationError(_("End date cannot be before start date."))
+
+        # Validate requested days don't exceed the employee's available balance
+        if start and end and leave_type and self.employee:
+            requested_days = (end - start).days + 1
+            try:
+                available_leave = AvailableLeave.objects.get(
+                    employee_id=self.employee,
+                    leave_type_id=leave_type,
+                )
+                total_available = available_leave.total_leave_days
+                if requested_days > total_available:
+                    raise forms.ValidationError(
+                        _(
+                            "You only have %(available)s day(s) available for %(leave_type)s, "
+                            "but requested %(requested)s day(s)."
+                        ) % {
+                            "available": total_available,
+                            "leave_type": leave_type.name,
+                            "requested": requested_days,
+                        }
+                    )
+            except AvailableLeave.DoesNotExist:
+                raise forms.ValidationError(
+                    _("No leave balance found for %(leave_type)s.") % {"leave_type": leave_type.name}
+                )
+
+        return cleaned_data
+
+
+class LeavePlanRejectForm(forms.Form):
+    """Form for rejecting a leave plan with an optional reason."""
+    reject_reason = forms.CharField(
+        label=_("Rejection Reason"),
+        required=False,
+        widget=forms.Textarea(attrs={"class": "oh-input w-100", "rows": 3}),
+    )

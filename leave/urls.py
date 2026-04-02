@@ -381,6 +381,18 @@ urlpatterns = [
     ),
 ]
 
+# Leave Planner URLs
+urlpatterns += [
+    path("planner/", views.leave_planner_view, name="leave-planner-view"),
+    path("planner/create/", views.leave_planner_create, name="leave-planner-create"),
+    path("planner/update/<int:plan_id>/", views.leave_planner_update, name="leave-planner-update"),
+    path("planner/delete/<int:plan_id>/", views.leave_planner_delete, name="leave-planner-delete"),
+    path("planner/manager/", views.manager_leave_planner_view, name="manager-leave-planner-view"),
+    path("planner/approve/<int:plan_id>/", views.leave_planner_approve, name="leave-planner-approve"),
+    path("planner/reject/<int:plan_id>/", views.leave_planner_reject, name="leave-planner-reject"),
+    path("planner/balance/", views.leave_planner_balance_api, name="leave-planner-balance"),
+]
+
 if apps.is_installed("recruitment"):
     urlpatterns.extend(
         [

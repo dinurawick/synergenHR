@@ -241,6 +241,11 @@ urlpatterns = [
         name="on-break-employees",
     ),
     path(
+        "work-from-home-employees",
+        attendance.views.dashboard.work_from_home_employees,
+        name="work-from-home-employees",
+    ),
+    path(
         "dashboard-approve-overtimes",
         attendance.views.dashboard.dashboard_approve_overtimes,
         name="dashboard-approve-overtimes",

@@ -55,6 +55,18 @@
                     </div>
                     {% endif %}
                 </div>
+                <div class="col-12 col-sm-12 col-md-6 col-lg-4">
+                    <div class="oh-card-dashboard oh-card-dashboard--info" style="background: linear-gradient(135deg, #e8f4fd, #d0eaf8); border-left: 4px solid #3498db;">
+                        <div class="oh-card-dashboard__header">
+                            <span class="oh-card-dashboard__title">{% trans "Work From Home" %}</span>
+                        </div>
+                        <div class="oh-card-dashboard__body">
+                            <div class="oh-card-dashboard__counts">
+                                <span class="oh-card-dashboard__count">{{work_from_home}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="oh-dashboard row pt-3">
                 <div class="oh-dashboard__movable-cards row mt-4">
@@ -148,7 +160,18 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-12 col-sm-12 col-md-12 col-lg-9">
+                <div class="col-12 col-sm-12 col-md-12 col-lg-3">
+                    <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent">
+                        <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
+                            <span class="oh-card-dashboard__title">{% trans "Work From Home" %}</span>
+                        </div>
+                        <div class="oh-card-dashboard__body" hx-get="{% url 'work-from-home-employees' %}" hx-trigger="load"
+                            id="wfhEmployeesCard" style="height:400px">
+                            <div class="animated-background h-100"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-12 col-md-12 col-lg-6">
                     <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent">
                         <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
                             <span class="oh-card-dashboard__title">{% trans "Overtime To Approve" %}</span>

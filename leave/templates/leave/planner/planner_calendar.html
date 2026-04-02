@@ -1,0 +1,285 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% block content %}
+<style>
+.lp-wrap { max-width: 900px; margin: 0 auto; }
+.lp-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.lp-balance-badge { background: #e8f4fd; border: 1px solid #3498db; border-radius: 8px; padding: 6px 14px; font-size: 0.88rem; }
+.lp-balance-badge span { font-weight: 700; color: #2980b9; }
+.lp-balance-badge.over span { color: #e74c3c; }
+.lp-cal-nav { display: flex; align-items: center; gap: 8px; }
+.lp-cal-nav button { background: none; border: 1px solid #ddd; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 1rem; }
+.lp-cal-nav button:hover { background: #f0f0f0; }
+.lp-month-label { font-weight: 700; font-size: 1rem; min-width: 140px; text-align: center; }
+.lp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.lp-day-header { text-align: center; font-size: 0.75rem; font-weight: 600; color: #888; padding: 4px 0; }
+.lp-day { min-height: 44px; border-radius: 6px; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.88rem; position: relative; transition: background 0.1s; user-select: none; }
+.lp-day:hover:not(.lp-empty):not(.lp-past) { background: #d6eaf8; border-color: #3498db; }
+.lp-day.lp-empty { border: none; cursor: default; }
+.lp-day.lp-past { color: #ccc; cursor: not-allowed; }
+.lp-day.lp-selected { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; font-weight: 700; }
+.lp-day.lp-range { background: #d6eaf8; border-color: #85c1e9; }
+.lp-day.lp-existing-pending { background: #fef9e7; border-color: #f39c12; }
+.lp-day.lp-existing-approved { background: #eafaf1; border-color: #27ae60; }
+.lp-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; margin-top: 10px; }
+.lp-legend-item { display: flex; align-items: center; gap: 5px; }
+.lp-legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #ccc; }
+.lp-note { width: 100%; margin-top: 12px; }
+.lp-note textarea { width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 8px; font-size: 0.9rem; resize: vertical; }
+.lp-submit-bar { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.lp-selected-info { font-size: 0.9rem; color: #555; }
+.lp-error { color: #e74c3c; font-size: 0.88rem; margin-top: 6px; }
+</style>
+
+<main :class="sidebarOpen ? 'oh-main__sidebar-visible' : ''">
+<section class="oh-wrapper oh-main__topbar">
+    <div class="oh-main__titlebar oh-main__titlebar--left">
+        <h1 class="oh-main__titlebar-title fw-bold">{{ title }}</h1>
+    </div>
+    <div class="oh-main__titlebar oh-main__titlebar--right">
+        <a href="{% url 'leave-planner-view' %}" class="oh-btn oh-btn--secondary">
+            <ion-icon name="arrow-back-outline" class="mr-1"></ion-icon>{% trans "Back" %}
+        </a>
+    </div>
+</section>
+
+<div class="oh-wrapper">
+<div class="lp-wrap">
+
+    {% if form.non_field_errors %}
+    <div class="oh-alert oh-alert--danger mb-3">
+        {% for e in form.non_field_errors %}<strong>{{ e }}</strong>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" id="lpForm">
+        {% csrf_token %}
+        <input type="hidden" name="leave_type_id" id="lpLeaveTypeHidden">
+        <input type="hidden" name="start_date" id="lpStartHidden">
+        <input type="hidden" name="end_date" id="lpEndHidden">
+        <input type="hidden" name="note" id="lpNoteHidden">
+
+        <div class="lp-controls">
+            <div class="oh-input-group" style="min-width:220px;">
+                <label class="oh-label">{% trans "Leave Type" %}</label>
+                <select id="lpLeaveType" class="oh-select" style="width:100%;">
+                    <option value="">— {% trans "Select leave type" %} —</option>
+                </select>
+            </div>
+            <div id="lpBalanceBadge" class="lp-balance-badge" style="display:none;">
+                {% trans "Balance" %}: <span id="lpBalanceNum">0</span> {% trans "days" %}
+                &nbsp;|&nbsp; {% trans "Selected" %}: <span id="lpSelectedNum">0</span> {% trans "days" %}
+            </div>
+        </div>
+        <div id="lpBalanceError" class="lp-error" style="display:none;"></div>
+
+        <div class="lp-cal-nav mb-2">
+            <button type="button" id="lpPrevYear">&#171;</button>
+            <button type="button" id="lpPrevMonth">&#8249;</button>
+            <div class="lp-month-label" id="lpMonthLabel"></div>
+            <button type="button" id="lpNextMonth">&#8250;</button>
+            <button type="button" id="lpNextYear">&#187;</button>
+        </div>
+
+        <div class="lp-grid" id="lpGrid">
+            <div class="lp-day-header">{% trans "Sun" %}</div>
+            <div class="lp-day-header">{% trans "Mon" %}</div>
+            <div class="lp-day-header">{% trans "Tue" %}</div>
+            <div class="lp-day-header">{% trans "Wed" %}</div>
+            <div class="lp-day-header">{% trans "Thu" %}</div>
+            <div class="lp-day-header">{% trans "Fri" %}</div>
+            <div class="lp-day-header">{% trans "Sat" %}</div>
+        </div>
+
+        <div class="lp-legend mt-2">
+            <div class="lp-legend-item"><div class="lp-legend-swatch" style="background:#2980b9;border-color:#2980b9;"></div> {% trans "Start / End" %}</div>
+            <div class="lp-legend-item"><div class="lp-legend-swatch" style="background:#d6eaf8;border-color:#85c1e9;"></div> {% trans "In range" %}</div>
+            <div class="lp-legend-item"><div class="lp-legend-swatch" style="background:#fef9e7;border-color:#f39c12;"></div> {% trans "Pending plan" %}</div>
+            <div class="lp-legend-item"><div class="lp-legend-swatch" style="background:#eafaf1;border-color:#27ae60;"></div> {% trans "Approved plan" %}</div>
+        </div>
+
+        <div class="lp-note mt-3">
+            <label class="oh-label">{% trans "Note (optional)" %}</label>
+            <textarea id="lpNote" rows="2" placeholder="{% trans 'Add a note...' %}">{{ form.note.value|default:'' }}</textarea>
+        </div>
+
+        <div class="lp-submit-bar">
+            <button type="submit" class="oh-btn oh-btn--secondary" id="lpSubmitBtn" disabled>{% trans "Submit Plan" %}</button>
+            <a href="{% url 'leave-planner-view' %}" class="oh-btn oh-btn--light">{% trans "Cancel" %}</a>
+            <span class="lp-selected-info" id="lpSelInfo" style="display:none;">
+                {% trans "From" %} <strong id="lpSelFrom"></strong> {% trans "to" %} <strong id="lpSelTo"></strong>
+                &nbsp;(<strong id="lpSelDays"></strong> {% trans "days" %})
+            </span>
+        </div>
+    </form>
+</div>
+</div>
+</main>
+
+<script>
+// @ts-nocheck
+(function() {
+    var leaveTypes = {{ leave_types_json|safe }};
+    var existingPlans = {{ existing_plans_json|safe }};
+    var editStart = "{{ edit_start|default:'' }}";
+    var editEnd = "{{ edit_end|default:'' }}";
+    var editLeaveTypeId = "{{ edit_leave_type_id|default:'' }}";
+
+    var currentYear = new Date().getFullYear();
+    var currentMonth = new Date().getMonth();
+    var currentBalance = 0;
+    var selStart = null;  // ISO string
+    var selEnd = null;    // ISO string
+
+    var grid = document.getElementById('lpGrid');
+    var monthLabel = document.getElementById('lpMonthLabel');
+    var balanceBadge = document.getElementById('lpBalanceBadge');
+    var balanceNum = document.getElementById('lpBalanceNum');
+    var selectedNum = document.getElementById('lpSelectedNum');
+    var balanceError = document.getElementById('lpBalanceError');
+    var submitBtn = document.getElementById('lpSubmitBtn');
+    var selInfo = document.getElementById('lpSelInfo');
+    var leaveTypeSelect = document.getElementById('lpLeaveType');
+
+    var MONTHS = ['January','February','March','April','May','June','July',
+                  'August','September','October','November','December'];
+
+    leaveTypes.forEach(function(lt) {
+        var opt = document.createElement('option');
+        opt.value = lt.id;
+        opt.textContent = lt.name + ' (' + lt.total + ' days available)';
+        leaveTypeSelect.appendChild(opt);
+    });
+
+    if (editLeaveTypeId) { leaveTypeSelect.value = editLeaveTypeId; onLeaveTypeChange(); }
+    if (editStart && editEnd) {
+        selStart = editStart; selEnd = editEnd;
+        var d0 = new Date(editStart);
+        currentYear = d0.getFullYear(); currentMonth = d0.getMonth();
+    }
+
+    leaveTypeSelect.addEventListener('change', function() { selStart = null; selEnd = null; onLeaveTypeChange(); });
+
+    function onLeaveTypeChange() {
+        var lt = null;
+        for (var i = 0; i < leaveTypes.length; i++) { if (leaveTypes[i].id == leaveTypeSelect.value) { lt = leaveTypes[i]; break; } }
+        if (lt) { currentBalance = lt.total; balanceNum.textContent = lt.total; balanceBadge.style.display = ''; }
+        else { currentBalance = 0; balanceBadge.style.display = 'none'; }
+        updateCounter(); renderCalendar();
+    }
+
+    function isoDate(y, m, d) { return y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0'); }
+    function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000) + 1; }
+
+    function getExistingClass(ds) {
+        for (var i = 0; i < existingPlans.length; i++) {
+            var p = existingPlans[i];
+            if (ds >= p.start_date && ds <= p.end_date) return p.status === 'approved' ? 'lp-existing-approved' : 'lp-existing-pending';
+        }
+        return null;
+    }
+
+    function normRange() {
+        if (!selStart) return [null, null];
+        if (!selEnd) return [selStart, selStart];
+        return selStart <= selEnd ? [selStart, selEnd] : [selEnd, selStart];
+    }
+
+    function renderCalendar() {
+        while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+        monthLabel.textContent = MONTHS[currentMonth] + ' ' + currentYear;
+
+        var today = new Date(); today.setHours(0,0,0,0);
+        var firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        var daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        var range = normRange();
+        var rs = range[0], re = range[1];
+
+        for (var i = 0; i < firstDay; i++) {
+            var emp = document.createElement('div'); emp.className = 'lp-day lp-empty'; grid.appendChild(emp);
+        }
+
+        for (var d = 1; d <= daysInMonth; d++) {
+            var ds = isoDate(currentYear, currentMonth, d);
+            var cd = new Date(currentYear, currentMonth, d);
+            var el = document.createElement('div');
+            el.className = 'lp-day'; el.textContent = d; el.dataset.date = ds;
+
+            if (cd < today) {
+                el.classList.add('lp-past');
+            } else {
+                var ec = getExistingClass(ds);
+                if (ec) el.classList.add(ec);
+                if (rs && re) {
+                    if (ds === rs || ds === re) el.classList.add('lp-selected');
+                    else if (ds > rs && ds < re) el.classList.add('lp-range');
+                }
+                el.addEventListener('click', onDayClick);
+            }
+            grid.appendChild(el);
+        }
+    }
+
+    function onDayClick(e) {
+        if (!leaveTypeSelect.value) { alert('Please select a leave type first.'); return; }
+        var clicked = e.currentTarget.dataset.date;
+
+        if (!selStart) {
+            selStart = clicked; selEnd = null;
+        } else if (!selEnd) {
+            if (clicked === selStart) { selStart = null; }
+            else { selEnd = clicked; }
+        } else {
+            // Both set: click before start → move start, anything else → move end
+            var rs = selStart <= selEnd ? selStart : selEnd;
+            if (clicked < rs) { selStart = clicked; }
+            else { selEnd = clicked; }
+        }
+
+        updateCounter(); renderCalendar();
+    }
+
+    function updateCounter() {
+        if (!selStart) {
+            selectedNum.textContent = '0'; selInfo.style.display = 'none';
+            submitBtn.disabled = true; balanceError.style.display = 'none';
+            balanceBadge.classList.remove('over'); return;
+        }
+        var range = normRange(); var s = range[0]; var e = range[1];
+        var days = daysBetween(s, e);
+        selectedNum.textContent = days;
+        selInfo.style.display = '';
+        document.getElementById('lpSelFrom').textContent = s;
+        document.getElementById('lpSelTo').textContent = e;
+        document.getElementById('lpSelDays').textContent = days;
+
+        if (currentBalance > 0 && days > currentBalance) {
+            balanceBadge.classList.add('over');
+            balanceError.style.display = '';
+            balanceError.textContent = 'You selected ' + days + ' days but only have ' + currentBalance + ' days available.';
+            submitBtn.disabled = true;
+        } else {
+            balanceBadge.classList.remove('over');
+            balanceError.style.display = 'none';
+            submitBtn.disabled = !leaveTypeSelect.value || !selStart;
+        }
+    }
+
+    document.getElementById('lpPrevMonth').onclick = function() { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderCalendar(); };
+    document.getElementById('lpNextMonth').onclick = function() { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderCalendar(); };
+    document.getElementById('lpPrevYear').onclick = function() { currentYear--; renderCalendar(); };
+    document.getElementById('lpNextYear').onclick = function() { currentYear++; renderCalendar(); };
+
+    document.getElementById('lpForm').addEventListener('submit', function(ev) {
+        if (!leaveTypeSelect.value || !selStart) { ev.preventDefault(); return; }
+        var range = normRange();
+        document.getElementById('lpLeaveTypeHidden').value = leaveTypeSelect.value;
+        document.getElementById('lpStartHidden').value = range[0];
+        document.getElementById('lpEndHidden').value = range[1];
+        document.getElementById('lpNoteHidden').value = document.getElementById('lpNote').value;
+    });
+
+    renderCalendar(); updateCounter();
+})();
+</script>
+{% endblock %}

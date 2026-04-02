@@ -1,0 +1,93 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% block content %}
+<main :class="sidebarOpen ? 'oh-main__sidebar-visible' : ''">
+    <section class="oh-wrapper oh-main__topbar">
+        <div class="oh-main__titlebar oh-main__titlebar--left">
+            <h1 class="oh-main__titlebar-title fw-bold">{{ title }}</h1>
+        </div>
+        <div class="oh-main__titlebar oh-main__titlebar--right">
+            <a href="{% url 'leave-planner-view' %}" class="oh-btn oh-btn--secondary">
+                <ion-icon name="arrow-back-outline" class="mr-1"></ion-icon>{% trans "Back" %}
+            </a>
+        </div>
+    </section>
+
+    <div class="oh-wrapper">
+
+        {# Non-field errors (validation failures like exceeding balance) #}
+        {% if form.non_field_errors %}
+        <div class="oh-alert oh-alert--danger mb-3" style="max-width:600px;">
+            <ion-icon name="warning-outline" class="mr-1"></ion-icon>
+            {% for error in form.non_field_errors %}
+                <strong>{{ error }}</strong>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Leave balance summary for the employee #}
+        {% if leave_balances %}
+        <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-3" style="max-width:600px;">
+            <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
+                <span class="oh-card-dashboard__title">{% trans "Your Leave Balances" %}</span>
+            </div>
+            <div class="oh-card-dashboard__body p-3">
+                <table class="w-100" style="font-size:0.9rem;">
+                    <thead>
+                        <tr>
+                            <th class="pb-2">{% trans "Leave Type" %}</th>
+                            <th class="pb-2 text-center">{% trans "Available" %}</th>
+                            <th class="pb-2 text-center">{% trans "Carry Forward" %}</th>
+                            <th class="pb-2 text-center">{% trans "Total" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bal in leave_balances %}
+                        <tr style="border-top:1px solid #eee;">
+                            <td class="py-1">{{ bal.leave_type_id.name }}</td>
+                            <td class="py-1 text-center">{{ bal.available_days }}</td>
+                            <td class="py-1 text-center">{{ bal.carryforward_days }}</td>
+                            <td class="py-1 text-center">
+                                <strong>{{ bal.total_leave_days }}</strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent" style="max-width:600px;">
+            <div class="oh-card-dashboard__body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                    <div class="oh-input-group mb-3">
+                        <label class="oh-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                            <span class="oh-input__error" style="color:#dc3545;font-size:0.85rem;">{{ error }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <p class="text-muted" style="font-size:0.82rem;">
+                        <ion-icon name="information-circle-outline"></ion-icon>
+                        {% trans "The number of days planned cannot exceed your total available balance for the selected leave type." %}
+                    </p>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="oh-btn oh-btn--secondary">
+                            {% trans "Save Plan" %}
+                        </button>
+                        <a href="{% url 'leave-planner-view' %}" class="oh-btn oh-btn--light">
+                            {% trans "Cancel" %}
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

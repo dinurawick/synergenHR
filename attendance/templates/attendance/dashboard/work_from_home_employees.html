@@ -1,0 +1,33 @@
+{% load static %}
+{% load i18n %}
+{% if wfh_employees %}
+    <ul class="oh-card-dashboard__user-list">
+        {% for attendance in wfh_employees %}
+            <li class="oh-card-dashboard__user-item">
+                <div class="oh-profile oh-profile--md">
+                    <div class="oh-profile__avatar mr-1">
+                        <img src="{{ attendance.employee_id.get_avatar }}"
+                            class="oh-profile__image"
+                            alt="{{ attendance.employee_id.get_full_name }}" />
+                    </div>
+                    <div>
+                        <span class="oh-profile__name oh-text--dark">{{ attendance.employee_id.get_full_name }}</span>
+                        {% if attendance.attendance_clock_in %}
+                        <br><small class="text-muted">{% trans "In" %}: {{ attendance.attendance_clock_in|time:"H:i" }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <div style="height:380px;display:flex;align-items:center;justify-content:center;">
+        <div class="text-center">
+            <img style="display:block;width:70px;margin:20px auto;"
+                src="{% static 'images/ui/default_avatar.jpg' %}" alt="" />
+            <h3 style="font-size:16px" class="oh-404__subtitle">
+                {% trans "No employees are working from home today." %}
+            </h3>
+        </div>
+    </div>
+{% endif %}

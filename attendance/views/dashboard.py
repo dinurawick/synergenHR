@@ -95,6 +95,12 @@ def dashboard(request):
             f"{(marked_attendances / expected_attendances) * 100:.2f}"
         )
 
+    # Work from home: today's attendances where work type contains "work from home" or "remote"
+    work_from_home = Attendance.objects.filter(
+        attendance_date=today.date(),
+        work_type_id__work_type__icontains="work from home",
+    ).count()
+
     return render(
         request,
         "attendance/dashboard/dashboard.html",
@@ -106,7 +112,26 @@ def dashboard(request):
             "expected_attendances": expected_attendances,
             "marked_attendances": marked_attendances,
             "marked_attendances_ratio": marked_attendances_ratio,
+            "work_from_home": work_from_home,
         },
+    )
+
+
+@login_required
+@hx_request_required
+def work_from_home_employees(request):
+    """
+    Returns a list of employees who are working from home today.
+    """
+    today = datetime.today()
+    wfh_attendances = Attendance.objects.filter(
+        attendance_date=today.date(),
+        work_type_id__work_type__icontains="work from home",
+    ).select_related("employee_id")
+    return render(
+        request,
+        "attendance/dashboard/work_from_home_employees.html",
+        {"wfh_employees": wfh_attendances},
     )
 
 

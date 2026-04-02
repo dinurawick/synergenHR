@@ -52,6 +52,15 @@ SUBMENUS = [
         "accessibility": "leave.sidebar.company_leave_accessibility",
     },
     {
+        "menu": trans("My Leave Planner"),
+        "redirect": reverse("leave-planner-view"),
+    },
+    {
+        "menu": trans("Leave Planner Approvals"),
+        "redirect": reverse("manager-leave-planner-view"),
+        "accessibility": "leave.sidebar.leave_planner_approval_accessibility",
+    },
+    {
         "menu": trans("Restrict Leaves"),
         "redirect": reverse("restrict-view"),
         "accessibility": "leave.sidebar.restrict_leave_accessibility",
@@ -100,6 +109,15 @@ def company_leave_accessibility(request, submenu, user_perms, *args, **kwargs):
 def restrict_leave_accessibility(request, submenu, user_perms, *args, **kwargs):
     return not request.user.is_superuser and not request.user.has_perm(
         "leave.view_restrictleave"
+    )
+
+
+def leave_planner_approval_accessibility(request, submenu, user_perms, *args, **kwargs):
+    """Only visible to reporting managers or users with leave change permission."""
+    return (
+        is_reportingmanager(request.user)
+        or request.user.has_perm("leave.change_leaveplan")
+        or request.user.is_superuser
     )
 
 

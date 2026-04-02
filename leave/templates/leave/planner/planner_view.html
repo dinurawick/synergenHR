@@ -1,0 +1,242 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% block content %}
+<style>
+.lpv-wrap { max-width: 960px; margin: 0 auto; }
+.lpv-cal-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.lpv-cal-nav button { background: none; border: 1px solid #ddd; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 1rem; }
+.lpv-cal-nav button:hover { background: #f0f0f0; }
+.lpv-month-label { font-weight: 700; font-size: 1.05rem; min-width: 160px; text-align: center; }
+.lpv-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.lpv-day-header { text-align: center; font-size: 0.75rem; font-weight: 600; color: #888; padding: 4px 0; }
+.lpv-day { min-height: 52px; border-radius: 6px; border: 1px solid #eee; padding: 4px 6px; font-size: 0.85rem; position: relative; background: #fff; }
+.lpv-day.lpv-empty { border: none; background: transparent; }
+.lpv-day.lpv-today { border-color: #3498db; background: #eaf4fd; }
+.lpv-day.lpv-past { color: #bbb; }
+.lpv-day-num { font-weight: 600; font-size: 0.82rem; }
+.lpv-event { border-radius: 3px; font-size: 0.72rem; padding: 1px 4px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lpv-event.pending  { background: #fef3cd; color: #856404; border-left: 3px solid #f39c12; }
+.lpv-event.approved { background: #d1f2eb; color: #1a6645; border-left: 3px solid #27ae60; }
+.lpv-event.rejected { background: #fde8e8; color: #922b21; border-left: 3px solid #e74c3c; }
+.lpv-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; margin: 10px 0 20px; }
+.lpv-legend-item { display: flex; align-items: center; gap: 5px; }
+.lpv-legend-dot { width: 12px; height: 12px; border-radius: 2px; }
+</style>
+
+<main :class="sidebarOpen ? 'oh-main__sidebar-visible' : ''">
+<section class="oh-wrapper oh-main__topbar">
+    <div class="oh-main__titlebar oh-main__titlebar--left">
+        <h1 class="oh-main__titlebar-title fw-bold">{% trans "My Leave Planner" %}</h1>
+    </div>
+    <div class="oh-main__titlebar oh-main__titlebar--right">
+        <a href="{% url 'leave-planner-create' %}" class="oh-btn oh-btn--secondary">
+            <ion-icon name="add-outline" class="mr-1"></ion-icon>{% trans "New Plan" %}
+        </a>
+    </div>
+</section>
+
+<div class="oh-wrapper">
+<div class="lpv-wrap">
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="oh-alert oh-alert--{{ message.tags }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Calendar card -->
+    <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-4">
+        <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
+            <div class="lpv-cal-nav">
+                <button id="lpvPrevYear">&#171;</button>
+                <button id="lpvPrevMonth">&#8249;</button>
+                <div class="lpv-month-label" id="lpvMonthLabel"></div>
+                <button id="lpvNextMonth">&#8250;</button>
+                <button id="lpvNextYear">&#187;</button>
+            </div>
+            <div class="lpv-legend">
+                <div class="lpv-legend-item"><div class="lpv-legend-dot" style="background:#f39c12;"></div> {% trans "Pending" %}</div>
+                <div class="lpv-legend-item"><div class="lpv-legend-dot" style="background:#27ae60;"></div> {% trans "Approved" %}</div>
+                <div class="lpv-legend-item"><div class="lpv-legend-dot" style="background:#e74c3c;"></div> {% trans "Rejected" %}</div>
+            </div>
+        </div>
+        <div class="oh-card-dashboard__body p-3">
+            <div class="lpv-grid" id="lpvGrid">
+                <div class="lpv-day-header">{% trans "Sun" %}</div>
+                <div class="lpv-day-header">{% trans "Mon" %}</div>
+                <div class="lpv-day-header">{% trans "Tue" %}</div>
+                <div class="lpv-day-header">{% trans "Wed" %}</div>
+                <div class="lpv-day-header">{% trans "Thu" %}</div>
+                <div class="lpv-day-header">{% trans "Fri" %}</div>
+                <div class="lpv-day-header">{% trans "Sat" %}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plans list -->
+    {% if plans %}
+    <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent">
+        <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
+            <span class="oh-card-dashboard__title">{% trans "All Plans" %}</span>
+        </div>
+        <div class="oh-card-dashboard__body p-0">
+            <table class="oh-sticky-table w-100">
+                <thead>
+                    <tr>
+                        <th class="oh-sticky-table__head">{% trans "Leave Type" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "Start" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "End" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "Days" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "Note" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "Status" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "Reject Reason" %}</th>
+                        <th class="oh-sticky-table__head">{% trans "Actions" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plan in plans %}
+                    <tr>
+                        <td>{{ plan.leave_type_id }}</td>
+                        <td>{{ plan.start_date|date:"d M Y" }}</td>
+                        <td>{{ plan.end_date|date:"d M Y" }}</td>
+                        <td>{{ plan.duration_days }}</td>
+                        <td>{{ plan.note|default:"-" }}</td>
+                        <td>
+                            {% if plan.status == "pending" %}
+                                <span class="oh-badge oh-badge--warning">{% trans "Pending" %}</span>
+                            {% elif plan.status == "approved" %}
+                                <span class="oh-badge oh-badge--success">{% trans "Approved" %}</span>
+                            {% else %}
+                                <span class="oh-badge oh-badge--danger">{% trans "Rejected" %}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ plan.reject_reason|default:"-" }}</td>
+                        <td class="d-flex gap-1">
+                            {% if plan.can_edit %}
+                            <a href="{% url 'leave-planner-update' plan.id %}" class="oh-btn oh-btn--secondary oh-btn--small">
+                                <ion-icon name="create-outline"></ion-icon>
+                            </a>
+                            {% endif %}
+                            {% if plan.can_delete %}
+                            <a href="{% url 'leave-planner-delete' plan.id %}"
+                               class="oh-btn oh-btn--danger oh-btn--small confirm-action"
+                               data-confirm="{% trans 'Delete this plan?' %}">
+                                <ion-icon name="trash-outline"></ion-icon>
+                            </a>
+                            {% endif %}
+                            {% if plan.status == "approved" %}
+                            <span class="oh-badge oh-badge--light">{% trans "Read-only" %}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="oh-card-dashboard oh-card-dashboard--transparent text-center p-5">
+        <ion-icon name="calendar-outline" style="font-size:3rem;color:#aaa;"></ion-icon>
+        <p class="mt-3 text-muted">{% trans "No leave plans yet. Click 'New Plan' to get started." %}</p>
+    </div>
+    {% endif %}
+
+</div>
+</div>
+</main>
+
+<script>
+// @ts-nocheck
+(function() {
+    var plans = {{ plans_json|safe }};
+    var currentYear = new Date().getFullYear();
+    var currentMonth = new Date().getMonth();
+    var MONTHS = ['January','February','March','April','May','June','July',
+                  'August','September','October','November','December'];
+
+    var grid = document.getElementById('lpvGrid');
+    var monthLabel = document.getElementById('lpvMonthLabel');
+
+    function isoDate(y, m, d) {
+        return y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    }
+
+    function getPlansForDate(dateStr) {
+        return plans.filter(function(p) { return dateStr >= p.start && dateStr <= p.end; });
+    }
+
+    function renderCalendar() {
+        while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+        monthLabel.textContent = MONTHS[currentMonth] + ' ' + currentYear;
+
+        var today = new Date(); today.setHours(0,0,0,0);
+        var todayStr = today.toISOString().slice(0,10);
+        var firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        var daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+        for (var i = 0; i < firstDay; i++) {
+            var empty = document.createElement('div');
+            empty.className = 'lpv-day lpv-empty';
+            grid.appendChild(empty);
+        }
+
+        for (var d = 1; d <= daysInMonth; d++) {
+            var dateStr = isoDate(currentYear, currentMonth, d);
+            var cell = document.createElement('div');
+            cell.className = 'lpv-day';
+
+            var cellDate = new Date(currentYear, currentMonth, d);
+            if (dateStr === todayStr) cell.classList.add('lpv-today');
+            else if (cellDate < today) cell.classList.add('lpv-past');
+
+            var numEl = document.createElement('div');
+            numEl.className = 'lpv-day-num';
+            numEl.textContent = d;
+            cell.appendChild(numEl);
+
+            var dayPlans = getPlansForDate(dateStr);
+            dayPlans.forEach(function(p) {
+                var ev = document.createElement('div');
+                ev.className = 'lpv-event ' + p.status;
+                // Only show label on start date to avoid repetition
+                if (dateStr === p.start) {
+                    ev.textContent = p.leave_type;
+                } else {
+                    ev.innerHTML = '&nbsp;';
+                }
+                ev.title = p.leave_type + ' (' + p.status + ')' + (p.note ? ' — ' + p.note : '');
+                cell.appendChild(ev);
+            });
+
+            grid.appendChild(cell);
+        }
+    }
+
+    document.getElementById('lpvPrevMonth').onclick = function() {
+        currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; } renderCalendar();
+    };
+    document.getElementById('lpvNextMonth').onclick = function() {
+        currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } renderCalendar();
+    };
+    document.getElementById('lpvPrevYear').onclick = function() { currentYear--; renderCalendar(); };
+    document.getElementById('lpvNextYear').onclick = function() { currentYear++; renderCalendar(); };
+
+    // Jump to the month of the first upcoming plan if any
+    var upcoming = plans.filter(function(p) { return p.start >= new Date().toISOString().slice(0,10); });
+    if (upcoming.length > 0) {
+        var d = new Date(upcoming[0].start);
+        currentYear = d.getFullYear();
+        currentMonth = d.getMonth();
+    }
+
+    renderCalendar();
+
+    // Confirm delete
+    document.querySelectorAll('.confirm-action').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            if (!confirm(this.dataset.confirm)) e.preventDefault();
+        });
+    });
+})();
+</script>
+{% endblock %}

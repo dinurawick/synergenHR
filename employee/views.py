@@ -3698,6 +3698,7 @@ def organisation_chart(request):
                         "title": getattr(
                             employee.get_job_position(), "job_position", _("Not set")
                         ),
+                        "img": employee.get_avatar(),
                         "children": create_hierarchy(employee),
                     }
                 )
@@ -3710,6 +3711,7 @@ def organisation_chart(request):
                         "title": getattr(
                             employee.get_job_position(), "job_position", _("Not set")
                         ),
+                        "img": employee.get_avatar(),
                         "className": "middle-level",
                         "children": create_hierarchy(employee),
                     }
@@ -3745,6 +3747,7 @@ def organisation_chart(request):
         node = {
             "name": manager.get_full_name(),
             "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+            "img": manager.get_avatar(),
             "children": create_hierarchy(manager),
         }
         context = {"act_datasource": node}
@@ -3753,6 +3756,7 @@ def organisation_chart(request):
     node = {
         "name": manager.get_full_name(),
         "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+        "img": manager.get_avatar(),
         "children": create_hierarchy(manager),
     }
 

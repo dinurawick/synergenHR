@@ -1,0 +1,232 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% block content %}
+<style>
+.lp-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center; }
+.lp-modal-overlay.active { display:flex; }
+.lp-modal { background:#fff; border-radius:10px; padding:28px; max-width:480px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18); position:relative; }
+.lp-modal-close { position:absolute; top:12px; right:14px; background:none; border:none; font-size:1.4rem; cursor:pointer; color:#888; }
+.lp-modal h3 { margin:0 0 16px; font-size:1.1rem; }
+.lp-detail-row { display:flex; gap:8px; margin-bottom:8px; font-size:0.9rem; }
+.lp-detail-label { font-weight:600; min-width:110px; color:#555; }
+.lp-modal-actions { display:flex; gap:10px; margin-top:20px; }
+tr.lp-clickable { cursor:pointer; }
+tr.lp-clickable:hover td { background:#f5f9ff; }
+</style>
+
+<main :class="sidebarOpen ? 'oh-main__sidebar-visible' : ''">
+    <section class="oh-wrapper oh-main__topbar">
+        <div class="oh-main__titlebar oh-main__titlebar--left">
+            <h1 class="oh-main__titlebar-title fw-bold">{% trans "Leave Planner Approvals" %}</h1>
+        </div>
+    </section>
+
+    <div class="oh-wrapper">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="oh-alert oh-alert--{{ message.tags }} mb-3">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Pending plans -->
+        <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-4">
+            <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
+                <span class="oh-card-dashboard__title">{% trans "Pending Approval" %}</span>
+            </div>
+            <div class="oh-card-dashboard__body p-0">
+                {% with pending_plans=plans|dictsort:"start_date" %}
+                {% if plans %}
+                <table class="oh-sticky-table w-100">
+                    <thead>
+                        <tr>
+                            <th class="oh-sticky-table__head">{% trans "Employee" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Leave Type" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Dates" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Days" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Status" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in plans %}
+                        {% if plan.status == "pending" %}
+                        <tr class="lp-clickable"
+                            data-id="{{ plan.id }}"
+                            data-employee="{{ plan.employee_id.get_full_name }}"
+                            data-avatar="{{ plan.employee_id.get_avatar }}"
+                            data-leave-type="{{ plan.leave_type_id }}"
+                            data-start="{{ plan.start_date|date:'d M Y' }}"
+                            data-end="{{ plan.end_date|date:'d M Y' }}"
+                            data-days="{{ plan.duration_days }}"
+                            data-note="{{ plan.note|default:'' }}"
+                            data-status="{{ plan.status }}"
+                            data-approved-by="{{ plan.approved_by.get_full_name|default:'' }}"
+                            data-reject-reason="{{ plan.reject_reason|default:'' }}"
+                            data-approve-url="{% url 'leave-planner-approve' plan.id %}"
+                            data-reject-url="{% url 'leave-planner-reject' plan.id %}">
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="{{ plan.employee_id.get_avatar }}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;" alt="">
+                                    {{ plan.employee_id.get_full_name }}
+                                </div>
+                            </td>
+                            <td>{{ plan.leave_type_id }}</td>
+                            <td>{{ plan.start_date|date:"d M Y" }} — {{ plan.end_date|date:"d M Y" }}</td>
+                            <td>{{ plan.duration_days }}</td>
+                            <td><span class="oh-badge oh-badge--warning">{% trans "Pending" %}</span></td>
+                            <td>
+                                <a href="{% url 'leave-planner-approve' plan.id %}" class="oh-btn oh-btn--success oh-btn--small confirm-action" data-confirm="Approve this plan?">
+                                    <ion-icon name="checkmark-outline"></ion-icon>
+                                </a>
+                                <a href="{% url 'leave-planner-reject' plan.id %}" class="oh-btn oh-btn--danger oh-btn--small">
+                                    <ion-icon name="close-outline"></ion-icon>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center p-4 text-muted">{% trans "No pending plans." %}</div>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- All plans history -->
+        <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent">
+            <div class="oh-card-dashboard__header oh-card-dashboard__header--divider">
+                <span class="oh-card-dashboard__title">{% trans "All Plans (History)" %}</span>
+            </div>
+            <div class="oh-card-dashboard__body p-0">
+                {% if all_plans %}
+                <table class="oh-sticky-table w-100">
+                    <thead>
+                        <tr>
+                            <th class="oh-sticky-table__head">{% trans "Employee" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Leave Type" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Dates" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Days" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Status" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Actioned By" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in all_plans %}
+                        <tr class="lp-clickable"
+                            data-id="{{ plan.id }}"
+                            data-employee="{{ plan.employee_id.get_full_name }}"
+                            data-avatar="{{ plan.employee_id.get_avatar }}"
+                            data-leave-type="{{ plan.leave_type_id }}"
+                            data-start="{{ plan.start_date|date:'d M Y' }}"
+                            data-end="{{ plan.end_date|date:'d M Y' }}"
+                            data-days="{{ plan.duration_days }}"
+                            data-note="{{ plan.note|default:'' }}"
+                            data-status="{{ plan.status }}"
+                            data-approved-by="{{ plan.approved_by.get_full_name|default:'' }}"
+                            data-reject-reason="{{ plan.reject_reason|default:'' }}"
+                            data-approve-url="{% if plan.status == 'pending' %}{% url 'leave-planner-approve' plan.id %}{% endif %}"
+                            data-reject-url="{% if plan.status == 'pending' %}{% url 'leave-planner-reject' plan.id %}{% endif %}">
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="{{ plan.employee_id.get_avatar }}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;" alt="">
+                                    {{ plan.employee_id.get_full_name }}
+                                </div>
+                            </td>
+                            <td>{{ plan.leave_type_id }}</td>
+                            <td>{{ plan.start_date|date:"d M Y" }} — {{ plan.end_date|date:"d M Y" }}</td>
+                            <td>{{ plan.duration_days }}</td>
+                            <td>
+                                {% if plan.status == "pending" %}<span class="oh-badge oh-badge--warning">{% trans "Pending" %}</span>
+                                {% elif plan.status == "approved" %}<span class="oh-badge oh-badge--success">{% trans "Approved" %}</span>
+                                {% else %}<span class="oh-badge oh-badge--danger">{% trans "Rejected" %}</span>{% endif %}
+                            </td>
+                            <td>{{ plan.approved_by.get_full_name|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center p-4 text-muted">{% trans "No plans yet." %}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Detail modal -->
+<div class="lp-modal-overlay" id="lpModal">
+    <div class="lp-modal">
+        <button class="lp-modal-close" id="lpModalClose">&times;</button>
+        <h3>{% trans "Leave Plan Details" %}</h3>
+        <div class="lp-detail-row">
+            <img id="mdAvatar" src="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" alt="">
+            <div>
+                <div style="font-weight:700;" id="mdEmployee"></div>
+                <div style="font-size:0.82rem;color:#888;" id="mdLeaveType"></div>
+            </div>
+        </div>
+        <div class="lp-detail-row"><span class="lp-detail-label">{% trans "Dates" %}</span><span id="mdDates"></span></div>
+        <div class="lp-detail-row"><span class="lp-detail-label">{% trans "Days" %}</span><span id="mdDays"></span></div>
+        <div class="lp-detail-row"><span class="lp-detail-label">{% trans "Status" %}</span><span id="mdStatus"></span></div>
+        <div class="lp-detail-row" id="mdNoteRow"><span class="lp-detail-label">{% trans "Note" %}</span><span id="mdNote"></span></div>
+        <div class="lp-detail-row" id="mdRejectRow" style="display:none;"><span class="lp-detail-label">{% trans "Reject Reason" %}</span><span id="mdRejectReason"></span></div>
+        <div class="lp-detail-row" id="mdActionedRow" style="display:none;"><span class="lp-detail-label">{% trans "Actioned By" %}</span><span id="mdActionedBy"></span></div>
+        <div class="lp-modal-actions" id="mdActions"></div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.confirm-action').forEach(function(el) {
+    el.addEventListener('click', function(e) { if (!confirm(this.dataset.confirm)) e.preventDefault(); });
+});
+
+var modal = document.getElementById('lpModal');
+document.getElementById('lpModalClose').onclick = function() { modal.classList.remove('active'); };
+modal.addEventListener('click', function(e) { if (e.target === modal) modal.classList.remove('active'); });
+
+document.querySelectorAll('tr.lp-clickable').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+        if (e.target.closest('a')) return; // don't open modal when clicking action buttons
+        var d = row.dataset;
+        document.getElementById('mdAvatar').src = d.avatar;
+        document.getElementById('mdEmployee').textContent = d.employee;
+        document.getElementById('mdLeaveType').textContent = d.leaveType;
+        document.getElementById('mdDates').textContent = d.start + ' — ' + d.end;
+        document.getElementById('mdDays').textContent = d.days + ' days';
+        document.getElementById('mdNote').textContent = d.note || '—';
+
+        var statusEl = document.getElementById('mdStatus');
+        statusEl.innerHTML = d.status === 'approved'
+            ? '<span class="oh-badge oh-badge--success">Approved</span>'
+            : d.status === 'rejected'
+            ? '<span class="oh-badge oh-badge--danger">Rejected</span>'
+            : '<span class="oh-badge oh-badge--warning">Pending</span>';
+
+        var rejectRow = document.getElementById('mdRejectRow');
+        rejectRow.style.display = d.rejectReason ? '' : 'none';
+        document.getElementById('mdRejectReason').textContent = d.rejectReason;
+
+        var actionedRow = document.getElementById('mdActionedRow');
+        actionedRow.style.display = d.approvedBy ? '' : 'none';
+        document.getElementById('mdActionedBy').textContent = d.approvedBy;
+
+        var actions = document.getElementById('mdActions');
+        actions.innerHTML = '';
+        if (d.status === 'pending' && d.approveUrl) {
+            actions.innerHTML =
+                '<a href="' + d.approveUrl + '" class="oh-btn oh-btn--success oh-btn--small confirm-action" data-confirm="Approve this plan?">' +
+                '<ion-icon name="checkmark-outline"></ion-icon> Approve</a>' +
+                '<a href="' + d.rejectUrl + '" class="oh-btn oh-btn--danger oh-btn--small">'+
+                '<ion-icon name="close-outline"></ion-icon> Reject</a>';
+            actions.querySelectorAll('.confirm-action').forEach(function(el) {
+                el.addEventListener('click', function(e) { if (!confirm(this.dataset.confirm)) e.preventDefault(); });
+            });
+        }
+
+        modal.classList.add('active');
+    });
+});
+</script>
+{% endblock %}
