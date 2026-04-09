@@ -14,6 +14,21 @@
         min-height: 425px;
     }
 
+    /* Right sidebar cards should auto-size to content */
+    .oh-dashboard__right .oh-card-dashboard:not(.tile) {
+        min-height: unset;
+    }
+
+    /* Align left and right columns at the top */
+    .oh-dashboard__left,
+    .oh-dashboard__right {
+        padding-top: 0 !important;
+    }
+
+    .oh-dashboard__right .oh-dashboard__events:empty {
+        display: none;
+    }
+
     .oh-dashboard__movable-cards {
         padding-right: 0;
     }
@@ -180,7 +195,7 @@
                         </a>
                     </div>
                 {% endif %}
-                <div class="oh-dashboard__movable-cards row mt-4" id="tileContainer">
+                <div class="oh-dashboard__movable-cards row {% if perms.employee.view_employee %}mt-4{% endif %}" id="tileContainer">
                     {% include "dashboard_tile_container.html" %}
                 </div>
             </div>
@@ -189,34 +204,46 @@
             {% if 'birthday_view'|feature_is_accessible:request or perms.employee.view_employee %}
                 <div class="oh-dashboard__events" hx-get="{% url 'get-birthday' %}" hx-trigger="load"> </div>
             {% endif %}
+
+            <!-- Quick Actions (all users) -->
+            <div hx-get="{% url 'employee-quick-actions' %}" hx-trigger="load" id="empQuickActionsContainer">
+                <div class="animated-background" style="min-height:90px;border-radius:12px;margin-bottom:12px;"></div>
+            </div>
+
+            <!-- Announcements -->
             <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-3">
-                <div style="display: flex;align-items:center;justify-content:space-between;margin-right:20px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-right:20px">
                     <span class="oh-card-dashboard__title">{% trans "Announcements" %}</span>
                     {% if perms.base.add_announcement %}
-                        <span>
-                            <button id="addAnnouncement" style="display: inline-block;padding: 0px;
-                            border-radius: 6px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            width: 50px;
-                            height: 28px;" class="oh-btn oh-btn--secondary-outline float-end ms-3"
-                                hx-get="{% url 'create-announcement' %}" hx-target="#objectCreateModalTarget"
-                                hx-swap="innerHTML" data-toggle="oh-modal-toggle" data-target="#objectCreateModal"
-                                title="{% trans 'Create Announcement' %}">
-                                <ion-icon name="add-outline" class="m-0"></ion-icon>
-                            </button>
-                        </span>
+                        <button id="addAnnouncement" style="padding:0;border-radius:6px;display:flex;align-items:center;
+                                justify-content:center;width:50px;height:28px;"
+                            class="oh-btn oh-btn--secondary-outline float-end ms-3"
+                            hx-get="{% url 'create-announcement' %}" hx-target="#objectCreateModalTarget"
+                            hx-swap="innerHTML" data-toggle="oh-modal-toggle" data-target="#objectCreateModal"
+                            title="{% trans 'Create Announcement' %}">
+                            <ion-icon name="add-outline" class="m-0"></ion-icon>
+                        </button>
                     {% endif %}
                 </div>
-
                 <hr>
-
-                <div class="oh-card-dashboard__body" hx-get="{% url 'announcement-list' %}" hx-trigger="load"
-                    id="announcementListCard">
+                <div hx-get="{% url 'announcement-list' %}" hx-trigger="load" id="announcementListCard">
                     <div class="animated-background"></div>
                 </div>
             </div>
+
+            <!-- Attendance week strip -->
+            {% if "attendance"|app_installed %}
+            <div hx-get="{% url 'employee-attendance-week' %}" hx-trigger="load" id="empAttendanceWeekContainer">
+                <div class="animated-background" style="min-height:110px;border-radius:12px;margin-bottom:12px;"></div>
+            </div>
+            {% endif %}
+
+            <!-- Mini calendar -->
+            {% if "leave"|app_installed %}
+            <div hx-get="{% url 'employee-dashboard-widgets' %}" hx-trigger="load" id="empMiniCalendarContainer">
+                <div class="animated-background" style="min-height:280px;border-radius:12px;margin-bottom:12px;"></div>
+            </div>
+            {% endif %}
             {% if "leave"|app_installed %}
                 {% if perms.leave.view_leaverequest or request.user|is_reportingmanager %}
                     <div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-3">
@@ -368,6 +395,7 @@
         }
 
         const defaultTileOrder = [
+            "empLeaveStatusCard",
             "notInYetId", "LeaveApprove", "shiftRequestApprove", "WorkTypeRequestApprove", "AttendanceValidate", "OTApprove",
             "LeaveAllocationApprove", "feedbackAnswer", "assetRequestApprove", "movable8", "pendingHours", "notoutYetId",
             "movable2", "movable3", "movable4", "movable1", "movable5", "movable6", "movable7", "movable9", "movable10", "movable11"
@@ -383,11 +411,19 @@
         } else {
             let storedIds = JSON.parse(localStorage.getItem("tileOrder")) || [];
 
+            // Force-inject any known tiles that may have been added after localStorage was first set
+            const knownNewTiles = ["empLeaveStatusCard"];
+            knownNewTiles.forEach(function(id) {
+                if (!storedIds.includes(id)) {
+                    storedIds.unshift(id); // add to front
+                }
+            });
+
             // Add only new tiles (not already in storage) to the end
             const newTileIds = setDifference(storedIds, allCurrentTileIds);  // removes missing IDs
             const missingTileIds = setDifference(allCurrentTileIds, storedIds);  // adds new IDs
 
-            const updatedOrder = storedIds.filter(id => allCurrentTileIds.includes(id)); // clean invalid
+            const updatedOrder = storedIds.filter(id => allCurrentTileIds.includes(id) || knownNewTiles.includes(id));
             const finalOrder = [...updatedOrder, ...missingTileIds];
 
             localStorage.setItem("tileOrder", JSON.stringify(finalOrder));
@@ -415,6 +451,22 @@
         }
 
         orderDashboardTile();
+
+        // Re-run order after HTMX loads async tiles (like empLeaveStatusCard)
+        document.addEventListener("htmx:afterSwap", function(e) {
+            if (e.target && e.target.id === "empLeaveStatusCard") {
+                orderDashboardTile();
+                // Re-bind mouseup for drag tracking on the new tile
+                $("#empLeaveStatusCard").on("mouseup", function () {
+                    setTimeout(() => {
+                        const newOrder = $(".oh-card-dashboard--moveable").map(function () {
+                            return $(this).attr("id");
+                        }).get();
+                        localStorage.setItem("tileOrder", JSON.stringify(newOrder));
+                    }, 10);
+                });
+            }
+        });
 
         // Update tileOrder on mouseup
         $(".oh-card-dashboard--moveable").on("mouseup", function () {

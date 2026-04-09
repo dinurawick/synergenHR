@@ -3716,6 +3716,37 @@ def organisation_chart(request):
                         "children": create_hierarchy(employee),
                     }
                 )
+        return nodes        # itrating through subordinates
+        for employee in subordinates:
+            if employee in entered_req_managers:
+                continue
+            # check the employee is a reporting manager if yes,remove className store
+            # it into entered_req_managers
+            if employee.id in result_dict.keys():
+                nodes.append(
+                    {
+                        "name": employee.get_full_name(),
+                        "title": str(getattr(
+                            employee.get_job_position(), "job_position", _("Not set")
+                        )),
+                        "img": employee.get_avatar(),
+                        "children": create_hierarchy(employee),
+                    }
+                )
+                entered_req_managers.append(employee)
+
+            else:
+                nodes.append(
+                    {
+                        "name": employee.get_full_name(),
+                        "title": str(getattr(
+                            employee.get_job_position(), "job_position", _("Not set")
+                        )),
+                        "img": employee.get_avatar(),
+                        "className": "middle-level",
+                        "children": create_hierarchy(employee),
+                    }
+                )
         return nodes
 
     selected_company = request.session.get("selected_company")
@@ -3743,10 +3774,14 @@ def organisation_chart(request):
     if request.method == "POST":
         if request.POST.get("manager_id"):
             manager_id = int(request.POST.get("manager_id"))
-            manager = Employee.objects.get(id=manager_id)
+            # Restrict to managers visible to this user (must be in result_dict)
+            if manager_id not in new_dict:
+                manager = request.user.employee_get
+            else:
+                manager = Employee.objects.get(id=manager_id)
         node = {
             "name": manager.get_full_name(),
-            "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+            "title": str(getattr(manager.get_job_position(), "job_position", _("Not set"))),
             "img": manager.get_avatar(),
             "children": create_hierarchy(manager),
         }
@@ -3755,7 +3790,7 @@ def organisation_chart(request):
 
     node = {
         "name": manager.get_full_name(),
-        "title": getattr(manager.get_job_position(), "job_position", _("Not set")),
+        "title": str(getattr(manager.get_job_position(), "job_position", _("Not set"))),
         "img": manager.get_avatar(),
         "children": create_hierarchy(manager),
     }

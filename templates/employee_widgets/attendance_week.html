@@ -1,0 +1,39 @@
+{% load i18n horillafilters %}
+<div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-3">
+    <div class="oh-card-dashboard__header oh-card-dashboard__header--divider" style="padding-bottom: 8px;">
+        <span class="oh-card-dashboard__title">{% trans "This Week" %}</span>
+        <a href="/attendance/view-my-attendance/" style="font-size:0.7rem;color:#6b7280;text-decoration:none;float:right;margin-top:2px;">{% trans "View all" %} &rarr;</a>
+    </div>
+    <div class="oh-card-dashboard__body" style="padding: 10px 4px 6px 4px;">
+        <div class="d-flex justify-content-between" style="gap: 4px;">
+            {% for day in week_days %}
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;">
+                <span style="font-size:0.65rem; font-weight:600; color:#9ca3af; text-transform:uppercase;">{{ day.label }}</span>
+                <div title="{{ day.tooltip }}"
+                     style="width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+                            background:{{ day.bg }}; border: 2px solid {{ day.border }};">
+                    {% if day.icon == "checkmark-outline" %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ day.icon_color }}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    {% elif day.icon == "close-outline" %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ day.icon_color }}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    {% elif day.icon == "time-outline" %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ day.icon_color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    {% elif day.icon == "sunny-outline" %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ day.icon_color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    {% else %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="{{ day.icon_color }}"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
+                    {% endif %}
+                </div>
+                <span style="font-size:0.6rem; color:{{ day.label_color }}; font-weight:500; text-align:center; line-height:1.2;">{{ day.status_label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <!-- Legend -->
+        <div class="d-flex flex-wrap justify-content-center mt-2" style="gap:10px; font-size:0.62rem; color:#6b7280;">
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:3px;"></span>{% trans "Present" %}</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:3px;"></span>{% trans "Late" %}</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:3px;"></span>{% trans "Absent" %}</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fbbf24;margin-right:3px;"></span>{% trans "Holiday" %}</span>
+        </div>
+    </div>
+</div>

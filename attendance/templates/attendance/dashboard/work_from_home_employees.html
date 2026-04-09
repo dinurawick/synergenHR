@@ -1,6 +1,6 @@
 {% load static %}
 {% load i18n %}
-{% if wfh_employees %}
+{% if wfh_employees or wfh_no_attendance %}
     <ul class="oh-card-dashboard__user-list">
         {% for attendance in wfh_employees %}
             <li class="oh-card-dashboard__user-item">
@@ -15,6 +15,21 @@
                         {% if attendance.attendance_clock_in %}
                         <br><small class="text-muted">{% trans "In" %}: {{ attendance.attendance_clock_in|time:"H:i" }}</small>
                         {% endif %}
+                    </div>
+                </div>
+            </li>
+        {% endfor %}
+        {% for employee in wfh_no_attendance %}
+            <li class="oh-card-dashboard__user-item">
+                <div class="oh-profile oh-profile--md">
+                    <div class="oh-profile__avatar mr-1">
+                        <img src="{{ employee.get_avatar }}"
+                            class="oh-profile__image"
+                            alt="{{ employee.get_full_name }}" />
+                    </div>
+                    <div>
+                        <span class="oh-profile__name oh-text--dark">{{ employee.get_full_name }}</span>
+                        <br><small class="text-muted text-warning">{% trans "Not clocked in" %}</small>
                     </div>
                 </div>
             </li>

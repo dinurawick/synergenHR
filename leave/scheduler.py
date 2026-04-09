@@ -49,13 +49,12 @@ def leave_reset():
 def monthly_recurring_leave_credit():
     """
     Credits leave days monthly for all leave types with monthly_recurring=True.
-    Runs daily; credits on the 1st of each month (or first run of the month).
-    Tracks last credit date to avoid double-crediting.
+    Runs daily; credits on the 1st of each month only.
+    Respects recurring_carry_forward: if disabled, resets to total_days instead of adding.
     """
     from leave.models import AvailableLeave, LeaveType
 
     today = datetime.now().date()
-    # Only run on the 1st of each month
     if today.day != 1:
         return
 
@@ -63,8 +62,14 @@ def monthly_recurring_leave_credit():
     for leave_type in recurring_leave_types:
         available_leaves = leave_type.employee_available_leave.all()
         for available_leave in available_leaves:
-            # Add the leave type's total_days to available_days
-            available_leave.available_days += leave_type.total_days
+            if leave_type.recurring_carry_forward:
+                # Carry forward unused days — just add the monthly allocation
+                available_leave.available_days = round(
+                    available_leave.available_days + leave_type.total_days, 3
+                )
+            else:
+                # No carry forward — reset to the monthly allocation
+                available_leave.available_days = leave_type.total_days
             available_leave.save()
 
 

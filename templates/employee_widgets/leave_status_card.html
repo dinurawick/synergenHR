@@ -1,0 +1,33 @@
+{% load i18n %}
+<div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent" style="min-height: 190px; max-height: 210px;">
+    <div class="oh-card-dashboard__header oh-card-dashboard__header--divider" style="padding-bottom: 8px;">
+        <span class="oh-card-dashboard__title">{% trans "My Leave Status" %}</span>
+        <span class="float-end chart_close_button" role="button"
+            hx-post="{% url 'dashboard-components-toggle' %}?chart_id=emp_leave_status"
+            hx-target="#empLeaveStatusCard"
+            hx-swap="outerHTML">
+            <i class="material-icons fw-lighter fs-5">close</i>
+        </span>
+    </div>
+    <div class="oh-card-dashboard__body p-0" style="height: calc(100% - 55px);">
+        <div class="d-flex h-100" style="border-radius: 0 0 12px 12px; overflow: hidden; min-height: 120px;">
+            <a href="/leave/user-request-view/?status=requested"
+               style="text-decoration:none; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+                      background: linear-gradient(135deg, #fff8e1, #fff3cd); padding: 16px 8px; cursor:pointer;">
+                <span style="font-size: 2.4rem; font-weight: 700; color: #f59e0b; line-height:1;">{{ pending_leaves }}</span>
+                <span style="font-size: 0.72rem; color: #92400e; margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{% trans "Pending" %}</span>
+                <ion-icon name="time-outline" style="font-size: 1.1rem; color: #f59e0b; margin-top: 4px;"></ion-icon>
+            </a>
+            <div style="width: 3px; background: #e5e7eb; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+                <div style="width:10px; height:10px; border-radius:50%; background:#d1d5db; border:2px solid #fff; position:absolute;"></div>
+            </div>
+            <a href="/leave/user-request-view/?status=approved"
+               style="text-decoration:none; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+                      background: linear-gradient(135deg, #ecfdf5, #d1fae5); padding: 16px 8px; cursor:pointer;">
+                <span style="font-size: 2.4rem; font-weight: 700; color: #10b981; line-height:1;">{{ approved_leaves }}</span>
+                <span style="font-size: 0.72rem; color: #065f46; margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{% trans "Approved" %}</span>
+                <ion-icon name="checkmark-circle-outline" style="font-size: 1.1rem; color: #10b981; margin-top: 4px;"></ion-icon>
+            </a>
+        </div>
+    </div>
+</div>

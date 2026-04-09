@@ -70,6 +70,14 @@ def attendance_post_save(sender, instance, **kwargs):
     if not instance.attendance_clock_out:
         status, message = "FDP", _("Currently working")
 
+    # Override status to WFH if the attendance work type is "Work from Home"
+    if (
+        instance.work_type_id
+        and "work from home" in instance.work_type_id.work_type.lower()
+    ):
+        status = "WFH"
+        message = _("Work From Home")
+
     work_record.work_record_type = status
     work_record.message = message
     work_record.save()

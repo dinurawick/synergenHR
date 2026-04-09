@@ -146,6 +146,7 @@ class LeaveTypeForm(ConditionForm):
             }),
             "monthly_recurring": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
             "recurring_carry_forward": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
+            "prorate_on_confirmation": forms.CheckboxInput(attrs={"class": "oh-switch__checkbox"}),
         }
 
     def clean(self):
@@ -334,6 +335,7 @@ class UpdateLeaveTypeForm(ConditionForm):
             'exclude_holiday', 'exclude_weekends', 'is_compensatory_leave',
             'monthly_recurring',
             'recurring_carry_forward',
+            'prorate_on_confirmation',
             'use_conditional_formatting', 'conditional_formatting_rule', 'gender_restriction', 'company_id'
         ]
         widgets = {
@@ -753,6 +755,25 @@ class UserLeaveRequestCreationForm(BaseModelForm):
         context = {"form": self}
         table_html = render_to_string("horilla_form.html", context)
         return table_html
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        employee = cleaned_data.get("employee_id")
+        if start_date and end_date and employee:
+            overlapping = LeaveRequest.objects.filter(
+                employee_id=employee,
+                start_date__lte=end_date,
+                end_date__gte=start_date,
+            ).exclude(status__in=["cancelled", "rejected"])
+            if self.instance and self.instance.pk:
+                overlapping = overlapping.exclude(pk=self.instance.pk)
+            if overlapping.exists():
+                raise forms.ValidationError(
+                    _("You already have a leave request for this date range.")
+                )
+        return cleaned_data
 
     def __init__(self, *args, **kwargs):
         employee = kwargs.pop("employee", None)

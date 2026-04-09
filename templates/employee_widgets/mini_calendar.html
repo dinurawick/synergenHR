@@ -1,0 +1,160 @@
+{% load i18n %}
+<div class="oh-card-dashboard oh-card-dashboard--no-scale oh-card-dashboard--transparent mb-3">
+    <div class="oh-card-dashboard__header oh-card-dashboard__header--divider" style="padding-bottom: 8px;">
+        <span class="oh-card-dashboard__title">{% trans "My Month" %}</span>
+        <div class="d-flex align-items-center float-end" style="gap:2px;">
+            <button onclick="empCalPrev()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:#6b7280;font-size:1.1rem;" title="Previous">&#8249;</button>
+            <span id="empCalMonthLabel" style="font-size:0.75rem;color:#374151;font-weight:600;min-width:88px;text-align:center;"></span>
+            <button onclick="empCalNext()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:#6b7280;font-size:1.1rem;" title="Next">&#8250;</button>
+        </div>
+    </div>
+    <div class="oh-card-dashboard__body" style="padding:6px 4px 8px 4px;">
+        <div class="d-flex flex-wrap mb-2" style="gap:8px;font-size:0.67rem;">
+            <span style="display:flex;align-items:center;gap:3px;">
+                <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#fbbf24;"></span>{% trans "Holiday" %}
+            </span>
+            <span style="display:flex;align-items:center;gap:3px;">
+                <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#10b981;"></span>{% trans "Approved" %}
+            </span>
+            <span style="display:flex;align-items:center;gap:3px;">
+                <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#f59e0b;"></span>{% trans "Pending" %}
+            </span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;" id="empCalTable">
+            <thead><tr id="empCalDayHeaders"></tr></thead>
+            <tbody id="empCalBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(function() {
+    var CAL_HOLIDAYS = [
+        {% for h in cal_holidays %}{
+            "start": "{{ h.start_date|date:'Y-m-d' }}",
+            "end": "{% if h.end_date %}{{ h.end_date|date:'Y-m-d' }}{% else %}{{ h.start_date|date:'Y-m-d' }}{% endif %}",
+            "name": "{{ h.name|escapejs }}"
+        }{% if not forloop.last %},{% endif %}{% endfor %}
+    ];
+    var CAL_LEAVES = [
+        {% for l in cal_leaves %}{
+            "start": "{{ l.start_date|date:'Y-m-d' }}",
+            "end": "{{ l.end_date|date:'Y-m-d' }}",
+            "status": "{{ l.status }}",
+            "type": "{{ l.leave_type_name|escapejs }}"
+        }{% if not forloop.last %},{% endif %}{% endfor %}
+    ];
+
+    var calYear, calMonth;
+    var today = new Date();
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function dateInRange(y, m, d, startStr, endStr) {
+        var check = new Date(y, m, d);
+        var s = new Date(startStr + 'T00:00:00');
+        var e = new Date((endStr || startStr) + 'T00:00:00');
+        return check >= s && check <= e;
+    }
+
+    function getDayInfo(y, m, d) {
+        var info = { holiday: null, leave: null };
+        for (var i = 0; i < CAL_HOLIDAYS.length; i++) {
+            if (dateInRange(y, m, d, CAL_HOLIDAYS[i].start, CAL_HOLIDAYS[i].end)) {
+                info.holiday = CAL_HOLIDAYS[i].name;
+                break;
+            }
+        }
+        for (var j = 0; j < CAL_LEAVES.length; j++) {
+            if (dateInRange(y, m, d, CAL_LEAVES[j].start, CAL_LEAVES[j].end)) {
+                info.leave = CAL_LEAVES[j];
+                break;
+            }
+        }
+        return info;
+    }
+
+    function render() {
+        var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        var DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+        document.getElementById('empCalMonthLabel').textContent = MONTHS[calMonth] + ' ' + calYear;
+
+        var hdr = document.getElementById('empCalDayHeaders');
+        hdr.innerHTML = '';
+        DAYS.forEach(function(d) {
+            var th = document.createElement('th');
+            th.textContent = d;
+            th.style.cssText = 'text-align:center;padding:3px 0;color:#9ca3af;font-weight:600;font-size:0.67rem;';
+            hdr.appendChild(th);
+        });
+
+        var firstDay = new Date(calYear, calMonth, 1).getDay();
+        var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+        var tbody = document.getElementById('empCalBody');
+        tbody.innerHTML = '';
+
+        var day = 1;
+        for (var row = 0; row < 6; row++) {
+            if (day > daysInMonth) break;
+            var tr = document.createElement('tr');
+            for (var col = 0; col < 7; col++) {
+                var td = document.createElement('td');
+                td.style.cssText = 'text-align:center;padding:2px 0;';
+                if ((row === 0 && col < firstDay) || day > daysInMonth) {
+                    // empty cell
+                } else {
+                    var info = getDayInfo(calYear, calMonth, day);
+                    var isToday = (calYear === today.getFullYear() && calMonth === today.getMonth() && day === today.getDate());
+                    var span = document.createElement('span');
+                    span.textContent = day;
+                    span.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:0.7rem;cursor:default;';
+
+                    if (isToday) {
+                        span.style.background = '#3b82f6';
+                        span.style.color = '#fff';
+                        span.style.fontWeight = '700';
+                    } else if (info.holiday) {
+                        span.style.background = '#fbbf24';
+                        span.style.color = '#78350f';
+                        span.title = info.holiday;
+                    } else if (info.leave) {
+                        span.style.background = info.leave.status === 'approved' ? '#10b981' : '#f59e0b';
+                        span.style.color = '#fff';
+                        span.title = info.leave.type + ' (' + info.leave.status + ')';
+                    } else if (col === 0 || col === 6) {
+                        span.style.color = '#d1d5db';
+                    }
+                    td.appendChild(span);
+                    day++;
+                }
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+    }
+
+    window.empCalPrev = function() {
+        calMonth--;
+        if (calMonth < 0) { calMonth = 11; calYear--; }
+        render();
+    };
+    window.empCalNext = function() {
+        calMonth++;
+        if (calMonth > 11) { calMonth = 0; calYear++; }
+        render();
+    };
+
+    function init() {
+        calYear = today.getFullYear();
+        calMonth = today.getMonth();
+        render();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>

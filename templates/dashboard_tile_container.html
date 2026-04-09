@@ -1,5 +1,16 @@
 {% load static basefilters horillafilters employee_filter i18n %} {% load tz %} {% now "Y-m-d" as current_date %}
 {% load accessibility_filters %}
+{% if "leave"|app_installed %}
+    {% if not 'emp_leave_status' in charts %}
+        <div class="col-12 col-sm-12 col-md-12 col-lg-6 oh-card-dashboard--moveable dashboardChart" id="empLeaveStatusCard"
+            hx-get="{% url 'employee-leave-status-widget' %}"
+            hx-trigger="load"
+            hx-target="#empLeaveStatusCard"
+            hx-swap="innerHTML">
+            <div class="animated-background" style="min-height:200px;border-radius:12px;"></div>
+        </div>
+    {% endif %}
+{% endif %}
 {% if "attendance"|app_installed %}
     {% if not 'offline_employees' in charts %}
         {% if perms.employee.view_employee or request.user|is_reportingmanager %}

@@ -16,6 +16,14 @@
                     <a href="/employee/employee-profile" class="oh-dropdown__link">{% trans "My Profile" %}</a>
                 </li>
                 <li class="oh-dropdown__item">
+                    <a href="#" class="oh-dropdown__link"
+                        hx-get="{% url 'employee-chart-show' %}"
+                        hx-target="#objectDetailsModalTarget"
+                        hx-swap="innerHTML"
+                        data-toggle="oh-modal-toggle"
+                        data-target="#objectDetailsModal">{% trans "Customize Dashboard" %}</a>
+                </li>
+                <li class="oh-dropdown__item">
                     <a href="/change-username" class="oh-dropdown__link">{% trans "Change Username" %}</a>
                 </li>
                 <li class="oh-dropdown__item">

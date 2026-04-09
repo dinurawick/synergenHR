@@ -111,9 +111,9 @@
                             {% endif %}
                         </td>
                         <td>{{ plan.reject_reason|default:"-" }}</td>
-                        <td class="d-flex gap-1">
+                        <td class="d-flex gap-1 align-items-center">
                             {% if plan.can_edit %}
-                            <a href="{% url 'leave-planner-update' plan.id %}" class="oh-btn oh-btn--secondary oh-btn--small">
+                            <a href="{% url 'leave-planner-update' plan.id %}" class="oh-btn oh-btn--secondary oh-btn--small" title="{% trans 'Edit' %}">
                                 <ion-icon name="create-outline"></ion-icon>
                             </a>
                             {% endif %}
@@ -125,7 +125,23 @@
                             </a>
                             {% endif %}
                             {% if plan.status == "approved" %}
-                            <span class="oh-badge oh-badge--light">{% trans "Read-only" %}</span>
+                                {% if plan.leave_request_id %}
+                                    <a href="{% url 'user-request-view' %}?id={{ plan.leave_request.id }}"
+                                       class="oh-btn oh-btn--light oh-btn--small"
+                                       title="{% trans 'View leave request' %}">
+                                        <ion-icon name="document-text-outline"></ion-icon>
+                                        <span style="font-size:0.78rem;">{% trans "View Leave" %}</span>
+                                    </a>
+                                {% else %}
+                                    <form method="post" action="{% url 'leave-planner-convert' plan.id %}" style="display:inline;" class="convert-form">
+                                        {% csrf_token %}
+                                        <button type="submit" class="oh-btn oh-btn--success oh-btn--small"
+                                                title="{% trans 'Convert to leave request' %}">
+                                            <ion-icon name="checkmark-circle-outline"></ion-icon>
+                                            <span style="font-size:0.78rem;">{% trans "Take Leave" %}</span>
+                                        </button>
+                                    </form>
+                                {% endif %}
                             {% endif %}
                         </td>
                     </tr>
@@ -145,10 +161,10 @@
 </div>
 </main>
 
+<script id="lpv-data" type="application/json">{{ plans_json|safe }}</script>
 <script>
-// @ts-nocheck
 (function() {
-    var plans = {{ plans_json|safe }};
+    var plans = JSON.parse(document.getElementById('lpv-data').textContent);
     var currentYear = new Date().getFullYear();
     var currentMonth = new Date().getMonth();
     var MONTHS = ['January','February','March','April','May','June','July',
@@ -235,6 +251,15 @@
     document.querySelectorAll('.confirm-action').forEach(function(el) {
         el.addEventListener('click', function(e) {
             if (!confirm(this.dataset.confirm)) e.preventDefault();
+        });
+    });
+
+    // Confirm convert (POST form)
+    document.querySelectorAll('.convert-form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            if (!confirm('Convert this approved plan into an actual leave request? This will deduct from your leave balance.')) {
+                e.preventDefault();
+            }
         });
     });
 })();

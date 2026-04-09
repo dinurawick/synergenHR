@@ -949,6 +949,7 @@ class WorkRecords(models.Model):
         ("HD", _("Holiday/Company Leave")),
         ("CONF", _("Conflict")),
         ("DFT", _("Draft")),
+        ("WFH", _("Work From Home")),
     ]
 
     record_name = models.CharField(max_length=250, null=True, blank=True)

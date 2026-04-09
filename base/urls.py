@@ -1070,6 +1070,26 @@ urlpatterns = [
         "company-leave-filter", views.company_leave_filter, name="company-leave-filter"
     ),
     path("view-penalties", views.view_penalties, name="view-penalties"),
+    path(
+        "employee-dashboard-widgets",
+        views.employee_dashboard_widgets,
+        name="employee-dashboard-widgets",
+    ),
+    path(
+        "employee-leave-status-widget",
+        views.employee_leave_status_widget,
+        name="employee-leave-status-widget",
+    ),
+    path(
+        "employee-quick-actions",
+        views.employee_quick_actions,
+        name="employee-quick-actions",
+    ),
+    path(
+        "employee-attendance-week",
+        views.employee_attendance_week,
+        name="employee-attendance-week",
+    ),
 ]
 
 urlpatterns.append(

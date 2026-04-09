@@ -252,6 +252,11 @@ class LeaveType(HorillaModel):
         verbose_name=_("Recurring Carry Forward"),
         help_text=_("If enabled, unused leave days from the previous month carry over to the next month."),
     )
+    prorate_on_confirmation = models.BooleanField(
+        default=False,
+        verbose_name=_("Pro-rate on Confirmation"),
+        help_text=_("If enabled, leave days are pro-rated based on the employee's confirmation date in the year of assignment. Employees confirmed in a prior year receive full days."),
+    )
 
     # Conditional formatting for dynamic leave allocation
     use_conditional_formatting = models.BooleanField(
@@ -1672,6 +1677,14 @@ class LeavePlan(HorillaModel):
         blank=True,
         related_name="approved_leave_plans",
         verbose_name=_("Approved/Rejected By"),
+    )
+    leave_request = models.OneToOneField(
+        "LeaveRequest",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="from_leave_plan",
+        verbose_name=_("Generated Leave Request"),
     )
     objects = HorillaCompanyManager(
         related_company_field="employee_id__employee_work_info__company_id"

@@ -2,16 +2,37 @@
 {% load i18n %}
 {% block content %}
 <style>
+/* ── Modal ── */
 .lp-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center; }
 .lp-modal-overlay.active { display:flex; }
-.lp-modal { background:#fff; border-radius:10px; padding:28px; max-width:480px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18); position:relative; }
+.lp-modal { background:#fff; border-radius:10px; padding:28px; max-width:520px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.18); position:relative; max-height:90vh; overflow-y:auto; }
 .lp-modal-close { position:absolute; top:12px; right:14px; background:none; border:none; font-size:1.4rem; cursor:pointer; color:#888; }
 .lp-modal h3 { margin:0 0 16px; font-size:1.1rem; }
 .lp-detail-row { display:flex; gap:8px; margin-bottom:8px; font-size:0.9rem; }
 .lp-detail-label { font-weight:600; min-width:110px; color:#555; }
 .lp-modal-actions { display:flex; gap:10px; margin-top:20px; }
+
+/* ── Conflict badge ── */
+.lp-conflict-badge {
+    display:inline-flex; align-items:center; gap:4px;
+    background:#fff3cd; color:#856404; border:1px solid #ffc107;
+    border-radius:12px; padding:2px 8px; font-size:0.78rem; font-weight:600;
+    cursor:pointer; white-space:nowrap;
+}
+.lp-conflict-badge ion-icon { font-size:0.9rem; }
+.lp-conflict-badge.lp-conflict-high { background:#f8d7da; color:#842029; border-color:#f5c2c7; }
+
+/* ── Conflict detail panel inside modal ── */
+.lp-conflict-list { margin-top:12px; border-top:1px solid #eee; padding-top:10px; }
+.lp-conflict-list-title { font-weight:700; font-size:0.88rem; color:#856404; margin-bottom:6px; display:flex; align-items:center; gap:5px; }
+.lp-conflict-item { background:#fff8e1; border-left:3px solid #f39c12; border-radius:4px; padding:6px 10px; margin-bottom:5px; font-size:0.85rem; }
+.lp-conflict-item.lp-conflict-approved { background:#fde8e8; border-left-color:#e74c3c; }
+
+/* ── Table rows ── */
 tr.lp-clickable { cursor:pointer; }
 tr.lp-clickable:hover td { background:#f5f9ff; }
+tr.lp-has-conflict td:first-child { border-left:3px solid #ffc107; }
+tr.lp-has-conflict-high td:first-child { border-left:3px solid #e74c3c; }
 </style>
 
 <main :class="sidebarOpen ? 'oh-main__sidebar-visible' : ''">
@@ -34,7 +55,6 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
                 <span class="oh-card-dashboard__title">{% trans "Pending Approval" %}</span>
             </div>
             <div class="oh-card-dashboard__body p-0">
-                {% with pending_plans=plans|dictsort:"start_date" %}
                 {% if plans %}
                 <table class="oh-sticky-table w-100">
                     <thead>
@@ -43,13 +63,13 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
                             <th class="oh-sticky-table__head">{% trans "Leave Type" %}</th>
                             <th class="oh-sticky-table__head">{% trans "Dates" %}</th>
                             <th class="oh-sticky-table__head">{% trans "Days" %}</th>
-                            <th class="oh-sticky-table__head">{% trans "Status" %}</th>
+                            <th class="oh-sticky-table__head">{% trans "Conflicts" %}</th>
                             <th class="oh-sticky-table__head">{% trans "Actions" %}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for plan in plans %}
-                        {% if plan.status == "pending" %}
+                        {% with conflicts=plan.conflicts %}
                         <tr class="lp-clickable"
                             data-id="{{ plan.id }}"
                             data-employee="{{ plan.employee_id.get_full_name }}"
@@ -60,10 +80,11 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
                             data-days="{{ plan.duration_days }}"
                             data-note="{{ plan.note|default:'' }}"
                             data-status="{{ plan.status }}"
-                            data-approved-by="{{ plan.approved_by.get_full_name|default:'' }}"
-                            data-reject-reason="{{ plan.reject_reason|default:'' }}"
+                            data-approved-by=""
+                            data-reject-reason=""
                             data-approve-url="{% url 'leave-planner-approve' plan.id %}"
-                            data-reject-url="{% url 'leave-planner-reject' plan.id %}">
+                            data-reject-url="{% url 'leave-planner-reject' plan.id %}"
+                            data-plan-id="{{ plan.id }}">
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <img src="{{ plan.employee_id.get_avatar }}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;" alt="">
@@ -73,9 +94,20 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
                             <td>{{ plan.leave_type_id }}</td>
                             <td>{{ plan.start_date|date:"d M Y" }} — {{ plan.end_date|date:"d M Y" }}</td>
                             <td>{{ plan.duration_days }}</td>
-                            <td><span class="oh-badge oh-badge--warning">{% trans "Pending" %}</span></td>
                             <td>
-                                <a href="{% url 'leave-planner-approve' plan.id %}" class="oh-btn oh-btn--success oh-btn--small confirm-action" data-confirm="Approve this plan?">
+                                {% if conflicts %}
+                                    <span class="lp-conflict-badge conflict-trigger" data-plan-id="{{ plan.id }}">
+                                        <ion-icon name="warning-outline"></ion-icon>
+                                        {{ conflicts|length }} {% trans "conflict(s)" %}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted" style="font-size:0.82rem;">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'leave-planner-approve' plan.id %}"
+                                   class="oh-btn oh-btn--success oh-btn--small confirm-action"
+                                   data-confirm="{% trans 'Approve this plan? A leave request will be created automatically.' %}">
                                     <ion-icon name="checkmark-outline"></ion-icon>
                                 </a>
                                 <a href="{% url 'leave-planner-reject' plan.id %}" class="oh-btn oh-btn--danger oh-btn--small">
@@ -83,14 +115,13 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
                                 </a>
                             </td>
                         </tr>
-                        {% endif %}
+                        {% endwith %}
                         {% endfor %}
                     </tbody>
                 </table>
                 {% else %}
                 <div class="text-center p-4 text-muted">{% trans "No pending plans." %}</div>
                 {% endif %}
-                {% endwith %}
             </div>
         </div>
 
@@ -126,8 +157,8 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
                             data-status="{{ plan.status }}"
                             data-approved-by="{{ plan.approved_by.get_full_name|default:'' }}"
                             data-reject-reason="{{ plan.reject_reason|default:'' }}"
-                            data-approve-url="{% if plan.status == 'pending' %}{% url 'leave-planner-approve' plan.id %}{% endif %}"
-                            data-reject-url="{% if plan.status == 'pending' %}{% url 'leave-planner-reject' plan.id %}{% endif %}">
+                            data-approve-url=""
+                            data-reject-url="">
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <img src="{{ plan.employee_id.get_avatar }}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;" alt="">
@@ -155,7 +186,7 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
     </div>
 </main>
 
-<!-- Detail modal -->
+<!-- Detail / Conflict modal -->
 <div class="lp-modal-overlay" id="lpModal">
     <div class="lp-modal">
         <button class="lp-modal-close" id="lpModalClose">&times;</button>
@@ -173,11 +204,27 @@ tr.lp-clickable:hover td { background:#f5f9ff; }
         <div class="lp-detail-row" id="mdNoteRow"><span class="lp-detail-label">{% trans "Note" %}</span><span id="mdNote"></span></div>
         <div class="lp-detail-row" id="mdRejectRow" style="display:none;"><span class="lp-detail-label">{% trans "Reject Reason" %}</span><span id="mdRejectReason"></span></div>
         <div class="lp-detail-row" id="mdActionedRow" style="display:none;"><span class="lp-detail-label">{% trans "Actioned By" %}</span><span id="mdActionedBy"></span></div>
+
+        <!-- Conflict section — shown only when conflicts exist -->
+        <div id="mdConflictSection" style="display:none;">
+            <div class="lp-conflict-list">
+                <div class="lp-conflict-list-title">
+                    <ion-icon name="warning-outline"></ion-icon>
+                    {% trans "Overlapping Leave" %}
+                </div>
+                <div id="mdConflictItems"></div>
+            </div>
+        </div>
+
         <div class="lp-modal-actions" id="mdActions"></div>
     </div>
 </div>
 
+<script id="lp-conflict-data" type="application/json">{{ conflict_map_json|safe }}</script>
 <script>
+// Conflict data from server
+var conflictMap = JSON.parse(document.getElementById('lp-conflict-data').textContent);
+
 document.querySelectorAll('.confirm-action').forEach(function(el) {
     el.addEventListener('click', function(e) { if (!confirm(this.dataset.confirm)) e.preventDefault(); });
 });
@@ -186,47 +233,109 @@ var modal = document.getElementById('lpModal');
 document.getElementById('lpModalClose').onclick = function() { modal.classList.remove('active'); };
 modal.addEventListener('click', function(e) { if (e.target === modal) modal.classList.remove('active'); });
 
+// Colour conflict badges based on severity (approved leave = red, plan overlap = amber)
+document.querySelectorAll('tr[data-plan-id]').forEach(function(row) {
+    var planId = row.dataset.planId;
+    var conflicts = conflictMap[planId];
+    if (!conflicts || conflicts.length === 0) return;
+    var hasApproved = conflicts.some(function(c) { return c.source === 'request'; });
+    var badge = row.querySelector('.conflict-trigger');
+    if (badge && hasApproved) {
+        badge.classList.add('lp-conflict-high');
+    }
+});
+
+// Open modal on row click
 document.querySelectorAll('tr.lp-clickable').forEach(function(row) {
     row.addEventListener('click', function(e) {
-        if (e.target.closest('a')) return; // don't open modal when clicking action buttons
-        var d = row.dataset;
-        document.getElementById('mdAvatar').src = d.avatar;
-        document.getElementById('mdEmployee').textContent = d.employee;
-        document.getElementById('mdLeaveType').textContent = d.leaveType;
-        document.getElementById('mdDates').textContent = d.start + ' — ' + d.end;
-        document.getElementById('mdDays').textContent = d.days + ' days';
-        document.getElementById('mdNote').textContent = d.note || '—';
-
-        var statusEl = document.getElementById('mdStatus');
-        statusEl.innerHTML = d.status === 'approved'
-            ? '<span class="oh-badge oh-badge--success">Approved</span>'
-            : d.status === 'rejected'
-            ? '<span class="oh-badge oh-badge--danger">Rejected</span>'
-            : '<span class="oh-badge oh-badge--warning">Pending</span>';
-
-        var rejectRow = document.getElementById('mdRejectRow');
-        rejectRow.style.display = d.rejectReason ? '' : 'none';
-        document.getElementById('mdRejectReason').textContent = d.rejectReason;
-
-        var actionedRow = document.getElementById('mdActionedRow');
-        actionedRow.style.display = d.approvedBy ? '' : 'none';
-        document.getElementById('mdActionedBy').textContent = d.approvedBy;
-
-        var actions = document.getElementById('mdActions');
-        actions.innerHTML = '';
-        if (d.status === 'pending' && d.approveUrl) {
-            actions.innerHTML =
-                '<a href="' + d.approveUrl + '" class="oh-btn oh-btn--success oh-btn--small confirm-action" data-confirm="Approve this plan?">' +
-                '<ion-icon name="checkmark-outline"></ion-icon> Approve</a>' +
-                '<a href="' + d.rejectUrl + '" class="oh-btn oh-btn--danger oh-btn--small">'+
-                '<ion-icon name="close-outline"></ion-icon> Reject</a>';
-            actions.querySelectorAll('.confirm-action').forEach(function(el) {
-                el.addEventListener('click', function(e) { if (!confirm(this.dataset.confirm)) e.preventDefault(); });
-            });
-        }
-
-        modal.classList.add('active');
+        if (e.target.closest('a') || e.target.closest('.conflict-trigger')) return;
+        openModal(row);
     });
 });
+
+// Open modal on conflict badge click (same modal, scrolls to conflict section)
+document.querySelectorAll('.conflict-trigger').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var row = el.closest('tr');
+        openModal(row, true);
+    });
+});
+
+function openModal(row, scrollToConflicts) {
+    var d = row.dataset;
+    document.getElementById('mdAvatar').src = d.avatar;
+    document.getElementById('mdEmployee').textContent = d.employee;
+    document.getElementById('mdLeaveType').textContent = d.leaveType;
+    document.getElementById('mdDates').textContent = d.start + ' — ' + d.end;
+    document.getElementById('mdDays').textContent = d.days + ' days';
+    document.getElementById('mdNote').textContent = d.note || '—';
+
+    var statusEl = document.getElementById('mdStatus');
+    statusEl.innerHTML = d.status === 'approved'
+        ? '<span class="oh-badge oh-badge--success">Approved</span>'
+        : d.status === 'rejected'
+        ? '<span class="oh-badge oh-badge--danger">Rejected</span>'
+        : '<span class="oh-badge oh-badge--warning">Pending</span>';
+
+    var rejectRow = document.getElementById('mdRejectRow');
+    rejectRow.style.display = d.rejectReason ? '' : 'none';
+    document.getElementById('mdRejectReason').textContent = d.rejectReason;
+
+    var actionedRow = document.getElementById('mdActionedRow');
+    actionedRow.style.display = d.approvedBy ? '' : 'none';
+    document.getElementById('mdActionedBy').textContent = d.approvedBy;
+
+    // Conflict section
+    var planId = d.planId || d.id;
+    var conflicts = conflictMap[planId];
+    var conflictSection = document.getElementById('mdConflictSection');
+    var conflictItems = document.getElementById('mdConflictItems');
+    conflictItems.innerHTML = '';
+
+    if (conflicts && conflicts.length > 0) {
+        conflictSection.style.display = '';
+        conflicts.forEach(function(c) {
+            var item = document.createElement('div');
+            item.className = 'lp-conflict-item' + (c.source === 'request' ? ' lp-conflict-approved' : '');
+            var sourceLabel = c.source === 'request'
+                ? '<strong style="color:#842029;">Approved Leave</strong>'
+                : '<strong style="color:#856404;">Pending Plan (' + c.status + ')</strong>';
+            item.innerHTML =
+                '<div>' + sourceLabel + ' &mdash; <strong>' + c.name + '</strong></div>' +
+                '<div style="font-size:0.8rem;color:#555;margin-top:2px;">' +
+                    'Their leave: ' + c.start + ' &ndash; ' + c.end +
+                '</div>' +
+                '<div style="font-size:0.8rem;font-weight:600;color:' + (c.source === 'request' ? '#842029' : '#856404') + ';margin-top:2px;">' +
+                    '&#9888; Overlap: ' + c.overlap_start + ' &ndash; ' + c.overlap_end +
+                    ' (' + c.overlap_days + ' day' + (c.overlap_days > 1 ? 's' : '') + ')' +
+                '</div>';
+            conflictItems.appendChild(item);
+        });
+    } else {
+        conflictSection.style.display = 'none';
+    }
+
+    // Action buttons
+    var actions = document.getElementById('mdActions');
+    actions.innerHTML = '';
+    if (d.status === 'pending' && d.approveUrl) {
+        actions.innerHTML =
+            '<a href="' + d.approveUrl + '" class="oh-btn oh-btn--success oh-btn--small confirm-action" ' +
+            'data-confirm="Approve this plan? A leave request will be created automatically.">' +
+            '<ion-icon name="checkmark-outline"></ion-icon> Approve</a>' +
+            '<a href="' + d.rejectUrl + '" class="oh-btn oh-btn--danger oh-btn--small">' +
+            '<ion-icon name="close-outline"></ion-icon> Reject</a>';
+        actions.querySelectorAll('.confirm-action').forEach(function(el) {
+            el.addEventListener('click', function(e) { if (!confirm(this.dataset.confirm)) e.preventDefault(); });
+        });
+    }
+
+    modal.classList.add('active');
+
+    if (scrollToConflicts && conflicts && conflicts.length > 0) {
+        setTimeout(function() { conflictSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
+    }
+}
 </script>
 {% endblock %}

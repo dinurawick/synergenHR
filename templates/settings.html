@@ -154,6 +154,15 @@
 													</div>
 												{% endif %}
 											{% endif %}
+											{% if request.user.is_superuser %}
+											<div class="oh-input-group">
+												<a
+													href="{% url 'whatsapp-settings' %}"
+													class="oh-inner-sidebar__link oh-dropdown__link"
+													>📱 {% trans "WhatsApp Integration" %}</a
+												>
+											</div>
+											{% endif %}
 										</div>
 									</div>
 								</div>

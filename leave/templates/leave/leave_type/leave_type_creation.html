@@ -336,6 +336,21 @@
                         </div>
                     </div>
                     
+                    <!-- Pro-rate on Confirmation -->
+                    <div class="col-sm-12 col-md-12 col-lg-6">
+                        <div class="oh-input-group oh-label__info justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <label for="id_prorate_on_confirmation" class="oh-label">{{ form.prorate_on_confirmation.label }}</label>
+                                <span class="oh-info me-3"
+                                    title="{% trans 'If enabled, employees confirmed in the current year receive pro-rated leave days based on their confirmation month. Employees confirmed in a prior year receive full days.' %}"></span>
+                            </div>
+                            <div class="oh-switch p-3">
+                                {{ form.prorate_on_confirmation }}
+                                {{ form.prorate_on_confirmation.errors }}
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Conditional Formatting Fields -->
                     <div class="col-sm-12 col-md-12 col-lg-6">
                         <div class="oh-input-group oh-label__info  justify-content-between">

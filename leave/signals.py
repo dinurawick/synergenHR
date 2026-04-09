@@ -130,3 +130,65 @@ def add_missing_leave_to_workrecords(sender, **kwargs):
 
     except Exception as e:
         print(f"Error in leave/work records sync: {e}")
+
+
+# ── WhatsApp approval/rejection notifications ────────────────────────────────
+
+@receiver(post_save, sender=LeaveRequest)
+def notify_employee_via_whatsapp(sender, instance, created, **kwargs):
+    """
+    When a LeaveRequest transitions to 'approved' or 'rejected',
+    send a WhatsApp message to the employee if integration is enabled.
+    """
+    import contextlib
+    import threading
+
+    if created:
+        return  # Only notify on status changes, not creation
+
+    if instance.status not in ("approved", "rejected", "cancelled"):
+        return
+
+    def _send():
+        with contextlib.suppress(Exception):
+            from whatsapp.models import WhatsAppSettings
+            settings_obj = WhatsAppSettings.get()
+            if not settings_obj.enabled:
+                return
+
+            employee = instance.employee_id
+            work_info = getattr(employee, "employee_work_info", None)
+            mobile = (work_info.mobile if work_info and work_info.mobile else None) or employee.phone
+            if not mobile:
+                return
+            if not getattr(work_info, "whatsapp_enabled", True) if work_info else False:
+                return
+
+            from whatsapp.sender import send_whatsapp
+
+            leave_type = str(instance.leave_type_id)
+            start = instance.start_date.strftime("%d %b %Y")
+            end = (instance.end_date or instance.start_date).strftime("%d %b %Y")
+
+            if instance.status == "approved":
+                msg = (
+                    f"✅ Your leave request has been approved!\n\n"
+                    f"📋 {leave_type}\n"
+                    f"📅 {start} – {end}\n\n"
+                    "Enjoy your time off! 🎉"
+                )
+            elif instance.status in ("rejected", "cancelled"):
+                reason = instance.reject_reason or ""
+                msg = (
+                    f"❌ Your leave request was not approved.\n\n"
+                    f"📋 {leave_type}\n"
+                    f"📅 {start} – {end}\n"
+                    + (f"📝 Reason: {reason}\n" if reason else "")
+                    + "\nContact HR if you have questions."
+                )
+            else:
+                return
+
+            send_whatsapp(mobile, msg)
+
+    threading.Thread(target=_send, daemon=True).start()

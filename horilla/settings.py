@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "attendance",
     "widget_tweaks",
     "django_apscheduler",
+    "whatsapp",
 ]
 APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"
 

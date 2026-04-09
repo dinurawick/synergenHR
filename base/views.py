@@ -6695,6 +6695,7 @@ def check_chart_permission(request, charts):
         "employees_chart": "employee",
         "gender_chart": "employee",
         "department_chart": "base",
+        "emp_leave_status": "leave",
     }
     permissions = {
         "offline_employees": "employee.view_employee",
@@ -6787,6 +6788,7 @@ def employee_chart_show(request):
         ("leave_allocation_approve", _("Leave Allocation to Approve")),
         ("feedback_answer", _("Feedbacks to Answer")),
         ("asset_request_approve", _("Asset Request to Approve")),
+        ("emp_leave_status", _("My Leave Status")),
     ]
     charts = check_chart_permission(request, charts)
 
@@ -6908,6 +6910,186 @@ def get_upcoming_holidays(request):
     for i, holiday in enumerate(holidays):
         holiday.background_color = colors[i]
     return render(request, "holiday/upcoming_holidays.html", {"holidays": holidays})
+
+
+@login_required
+def employee_quick_actions(request):
+    """Renders the quick action shortcuts partial."""
+    return render(request, "employee_widgets/quick_actions.html")
+
+
+@login_required
+def employee_attendance_week(request):
+    """
+    Renders the attendance week strip for the current employee.
+    Shows Mon-Fri of the current week with status: present, late, absent, holiday, future.
+    """
+    from django.apps import apps as django_apps
+
+    today = timezone.localdate()
+    # Find Monday of this week
+    monday = today - timedelta(days=today.weekday())
+
+    employee = request.user.employee_get
+
+    # Fetch attendance records for this week
+    week_dates = [monday + timedelta(days=i) for i in range(5)]  # Mon-Fri
+    attendance_map = {}
+    if django_apps.is_installed("attendance"):
+        from attendance.models import Attendance
+
+        records = Attendance.objects.filter(
+            employee_id=employee,
+            attendance_date__in=week_dates,
+        ).select_related()
+        for rec in records:
+            attendance_map[rec.attendance_date] = rec
+
+    # Fetch holidays for this week
+    holiday_dates = set()
+    week_holidays = Holidays.objects.filter(
+        start_date__lte=week_dates[-1],
+        end_date__gte=week_dates[0],
+    )
+    for h in week_holidays:
+        d = h.start_date
+        end = h.end_date or h.start_date
+        while d <= end:
+            if d in week_dates:
+                holiday_dates.add(d)
+            d += timedelta(days=1)
+    # Also check holidays with no end_date
+    single_holidays = Holidays.objects.filter(
+        start_date__in=week_dates, end_date__isnull=True
+    )
+    for h in single_holidays:
+        holiday_dates.add(h.start_date)
+
+    day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    week_days = []
+
+    for i, date_obj in enumerate(week_dates):
+        is_future = date_obj > today
+        is_holiday = date_obj in holiday_dates
+        rec = attendance_map.get(date_obj)
+
+        if is_holiday:
+            status = "holiday"
+        elif is_future:
+            status = "future"
+        elif rec:
+            # Check late come
+            is_late = rec.late_come_early_out.filter(type="late_come").exists()
+            status = "late" if is_late else "present"
+        else:
+            status = "absent"
+
+        style_map = {
+            "present": {
+                "bg": "#dcfce7", "border": "#10b981",
+                "icon": "checkmark-outline", "icon_color": "#10b981",
+                "label_color": "#065f46", "status_label": _("Present"),
+            },
+            "late": {
+                "bg": "#fef9c3", "border": "#f59e0b",
+                "icon": "time-outline", "icon_color": "#f59e0b",
+                "label_color": "#92400e", "status_label": _("Late"),
+            },
+            "absent": {
+                "bg": "#fee2e2", "border": "#ef4444",
+                "icon": "close-outline", "icon_color": "#ef4444",
+                "label_color": "#991b1b", "status_label": _("Absent"),
+            },
+            "holiday": {
+                "bg": "#fef3c7", "border": "#fbbf24",
+                "icon": "sunny-outline", "icon_color": "#f59e0b",
+                "label_color": "#78350f", "status_label": _("Holiday"),
+            },
+            "future": {
+                "bg": "#f3f4f6", "border": "#e5e7eb",
+                "icon": "ellipsis-horizontal-outline", "icon_color": "#9ca3af",
+                "label_color": "#9ca3af", "status_label": "—",
+            },
+        }
+
+        s = style_map[status]
+        week_days.append({
+            "label": day_labels[i],
+            "date": date_obj,
+            "tooltip": f"{date_obj.strftime('%d %b')} — {s['status_label']}",
+            **s,
+        })
+
+    return render(request, "employee_widgets/attendance_week.html", {"week_days": week_days})
+
+
+@login_required
+def employee_dashboard_widgets(request):
+    """
+    Returns context data for the employee dashboard widgets:
+    - mini calendar data (holidays + employee leaves for current month)
+    """
+    from django.apps import apps as django_apps
+
+    today = timezone.localdate()
+    employee = request.user.employee_get
+
+    cal_leaves = []
+    if django_apps.is_installed("leave"):
+        from leave.models import LeaveRequest
+
+        raw_leaves = LeaveRequest.objects.filter(
+            employee_id=employee,
+            status__in=["requested", "approved"],
+            start_date__year=today.year,
+        ).select_related("leave_type_id")
+
+        # Build plain dicts so template doesn't have to resolve FK names
+        for lr in raw_leaves:
+            cal_leaves.append({
+                "start_date": lr.start_date,
+                "end_date": lr.end_date or lr.start_date,
+                "status": lr.status,
+                "leave_type_name": str(lr.leave_type_id),
+            })
+
+    cal_holidays = list(Holidays.objects.filter(start_date__year=today.year))
+
+    return render(
+        request,
+        "employee_widgets/mini_calendar.html",
+        {
+            "cal_holidays": cal_holidays,
+            "cal_leaves": cal_leaves,
+        },
+    )
+
+
+@login_required
+def employee_leave_status_widget(request):
+    """
+    Returns just the leave status card partial (pending + approved counts).
+    """
+    from django.apps import apps as django_apps
+
+    employee = request.user.employee_get
+    pending_leaves = 0
+    approved_leaves = 0
+    if django_apps.is_installed("leave"):
+        from leave.models import LeaveRequest
+
+        qs = LeaveRequest.objects.filter(employee_id=employee)
+        pending_leaves = qs.filter(status="requested").count()
+        approved_leaves = qs.filter(status="approved").count()
+
+    return render(
+        request,
+        "employee_widgets/leave_status_card.html",
+        {
+            "pending_leaves": pending_leaves,
+            "approved_leaves": approved_leaves,
+        },
+    )
 
 
 @login_required

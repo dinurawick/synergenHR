@@ -49,13 +49,27 @@
         'visibleLevel': 2,
         'nodeContent': 'title',
         'nodeTemplate': function(data) {
-            return '<div class="oh-org-node">'
-                + '<img src="' + (data.img || '') + '" alt="' + data.name + '" '
-                + 'style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 6px;" '
-                + 'onerror="this.src=\'/static/images/ui/default_avatar.jpg\'">'
-                + '<div class="title">' + data.name + '</div>'
-                + '<div class="content">' + (data.title || '') + '</div>'
-                + '</div>';
+            var wrapper = document.createElement('div');
+            wrapper.className = 'oh-org-node';
+
+            var img = document.createElement('img');
+            img.src = data.img || '';
+            img.alt = data.name || '';
+            img.style.cssText = 'width:48px;height:48px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 6px;';
+            img.onerror = function() { this.src = '/static/images/ui/default_avatar.jpg'; };
+
+            var title = document.createElement('div');
+            title.className = 'title';
+            title.textContent = data.name || '';
+
+            var content = document.createElement('div');
+            content.className = 'content';
+            content.textContent = data.title || '';
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(title);
+            wrapper.appendChild(content);
+            return wrapper.outerHTML;
         }
     });
     $('#key-word').on('keyup', function (event) {

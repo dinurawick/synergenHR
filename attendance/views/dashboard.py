@@ -95,11 +95,21 @@ def dashboard(request):
             f"{(marked_attendances / expected_attendances) * 100:.2f}"
         )
 
-    # Work from home: today's attendances where work type contains "work from home" or "remote"
-    work_from_home = Attendance.objects.filter(
-        attendance_date=today.date(),
-        work_type_id__work_type__icontains="work from home",
-    ).count()
+    # Work from home: employees who clocked in today with WFH work type
+    # OR whose assigned work type is WFH
+    wfh_today_ids = set(
+        Attendance.objects.filter(
+            attendance_date=today.date(),
+            work_type_id__work_type__icontains="work from home",
+        ).values_list("employee_id_id", flat=True)
+    )
+    wfh_assigned_ids = set(
+        Employee.objects.filter(
+            is_active=True,
+            employee_work_info__work_type_id__work_type__icontains="work from home",
+        ).values_list("id", flat=True)
+    )
+    work_from_home = len(wfh_today_ids | wfh_assigned_ids)
 
     return render(
         request,
@@ -121,17 +131,55 @@ def dashboard(request):
 @hx_request_required
 def work_from_home_employees(request):
     """
-    Returns a list of employees who are working from home today.
+    Returns employees working from home today.
+    Includes: employees who clocked in today with WFH work type,
+    plus employees whose assigned work type is WFH (even if not yet clocked in).
+    Only shows employees the requesting user has permission to view.
     """
-    today = datetime.today()
-    wfh_attendances = Attendance.objects.filter(
-        attendance_date=today.date(),
+    today = datetime.today().date()
+
+    # Employees who clocked in today with WFH attendance
+    wfh_today_attendances = Attendance.objects.filter(
+        attendance_date=today,
         work_type_id__work_type__icontains="work from home",
     ).select_related("employee_id")
+
+    # Apply subordinate filtering so users only see employees they manage
+    wfh_today_attendances = filtersubordinates(
+        request=request,
+        perm="attendance.view_attendance",
+        queryset=wfh_today_attendances,
+    )
+
+    wfh_today_ids = set(wfh_today_attendances.values_list("employee_id_id", flat=True))
+
+    # Employees whose assigned work type is WFH (active employees)
+    wfh_assigned_qs = Employee.objects.filter(
+        is_active=True,
+        employee_work_info__work_type_id__work_type__icontains="work from home",
+    )
+    wfh_assigned_qs = filtersubordinates(
+        request=request,
+        perm="attendance.view_attendance",
+        queryset=wfh_assigned_qs,
+    )
+    wfh_assigned_ids = set(wfh_assigned_qs.values_list("id", flat=True))
+
+    # Employees assigned WFH but without today's attendance record
+    clocked_in_ids = wfh_today_ids
+    wfh_no_attendance = Employee.objects.filter(
+        id__in=wfh_assigned_ids - clocked_in_ids,
+        is_active=True,
+    )
+
     return render(
         request,
         "attendance/dashboard/work_from_home_employees.html",
-        {"wfh_employees": wfh_attendances},
+        {
+            "wfh_employees": wfh_today_attendances,
+            "wfh_no_attendance": wfh_no_attendance,
+            "total_wfh": len(wfh_today_ids | wfh_assigned_ids),
+        },
     )
 
 

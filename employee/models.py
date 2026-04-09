@@ -685,8 +685,16 @@ class EmployeeWorkInformation(models.Model):
     date_joining = models.DateField(
         null=True, blank=True, verbose_name=_("Joining Date")
     )
+    confirmation_date = models.DateField(
+        null=True, blank=True, verbose_name=_("Confirmation Date")
+    )
     contract_end_date = models.DateField(
         blank=True, null=True, verbose_name=_("Contract End Date")
+    )
+    whatsapp_enabled = models.BooleanField(
+        default=True,
+        verbose_name=_("WhatsApp HR Enabled"),
+        help_text=_("Allow this employee to use WhatsApp for leave requests."),
     )
     basic_salary = models.IntegerField(
         null=True, blank=True, default=0, verbose_name=_("Basic Salary")

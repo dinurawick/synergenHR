@@ -391,6 +391,7 @@ urlpatterns += [
     path("planner/approve/<int:plan_id>/", views.leave_planner_approve, name="leave-planner-approve"),
     path("planner/reject/<int:plan_id>/", views.leave_planner_reject, name="leave-planner-reject"),
     path("planner/balance/", views.leave_planner_balance_api, name="leave-planner-balance"),
+    path("planner/convert/<int:plan_id>/", views.leave_planner_convert, name="leave-planner-convert"),
 ]
 
 if apps.is_installed("recruitment"):

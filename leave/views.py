@@ -1041,7 +1041,7 @@ def leave_request_approve(request, id, emp_id=None):
     )
     if leave_type_id.monthly_recurring:
         total_available_leave = get_monthly_recurring_balance(
-            available_leave, leave_request.start_date
+            available_leave, leave_request.start_date, exclude_request_id=leave_request.id
         )
     send_notification = False
     if leave_request.status != "approved":
@@ -1661,10 +1661,26 @@ def leave_assign(request):
                 for leave_type in leave_types:
                     assignment_key = (leave_type.id, employee.id)
                     if assignment_key not in existing_assignments:
+                        # Calculate pro-rated days if applicable
+                        days_to_assign = leave_type.total_days
+                        if leave_type.prorate_on_confirmation:
+                            conf_date = getattr(
+                                getattr(employee, "employee_work_info", None),
+                                "confirmation_date",
+                                None,
+                            )
+                            if conf_date and conf_date.year == date.today().year:
+                                # Pro-rate: months remaining from confirmation month to Dec
+                                months_remaining = 13 - conf_date.month
+                                days_to_assign = round(
+                                    (months_remaining / 12) * leave_type.total_days, 1
+                                )
+                            # else: blank or prior year → full days (days_to_assign unchanged)
+
                         new_assignment = AvailableLeave(
                             leave_type_id=leave_type,
                             employee_id=employee,
-                            available_days=leave_type.total_days,
+                            available_days=days_to_assign,
                         )
                         new_assignments.append(new_assignment)
                         new_assignment.pre_save_processing()
@@ -4033,11 +4049,13 @@ def user_request_select_filter(request):
         return JsonResponse(context)
 
 
-def get_monthly_recurring_balance(available_leave, target_date):
+def get_monthly_recurring_balance(available_leave, target_date, exclude_request_id=None):
     """
     Compute the effective available balance for a monthly recurring leave type
     on a given target_date, walking month by month from assigned_date.
     Respects recurring_carry_forward setting.
+    exclude_request_id: exclude this leave request from 'taken' (used during approval
+    so the request being approved isn't double-counted).
     """
     import calendar as _cal
     from dateutil.relativedelta import relativedelta
@@ -4049,13 +4067,16 @@ def get_monthly_recurring_balance(available_leave, target_date):
 
     while cursor <= target_month:
         month_end = cursor.replace(day=_cal.monthrange(cursor.year, cursor.month)[1])
-        taken = LeaveRequest.objects.filter(
+        qs = LeaveRequest.objects.filter(
             employee_id=available_leave.employee_id,
             leave_type_id=leave_type,
             status__in=["approved", "requested"],
             start_date__lte=month_end,
             end_date__gte=cursor,
-        ).aggregate(total=Sum("requested_days"))["total"] or 0
+        )
+        if exclude_request_id:
+            qs = qs.exclude(id=exclude_request_id)
+        taken = qs.aggregate(total=Sum("requested_days"))["total"] or 0
 
         if leave_type.recurring_carry_forward:
             balance = leave_type.total_days + carry - taken
@@ -5704,36 +5725,119 @@ def leave_planner_delete(request, plan_id):
 @login_required
 def manager_leave_planner_view(request):
     """
-    Manager's view — pending plans at top, full history at bottom.
+    Manager's view — pending plans at top with conflict warnings, full history at bottom.
+    Conflicts = another employee's plan (pending or approved) overlaps the same dates.
     """
     manager_employee = request.user.employee_get
     subordinates = Employee.objects.filter(
         employee_work_info__reporting_manager_id=manager_employee,
         is_active=True,
     )
-    # Pending only for the top section
+
+    # Pending plans for the top section
     plans = LeavePlan.objects.filter(
         employee_id__in=subordinates, status="pending"
-    ).order_by("start_date")
+    ).order_by("start_date").select_related("employee_id", "leave_type_id")
+
     # All plans for history section
     all_plans = LeavePlan.objects.filter(
         employee_id__in=subordinates
-    ).order_by("-id")
+    ).order_by("-id").select_related("employee_id", "leave_type_id", "approved_by")
+
+    # ── Conflict detection ──────────────────────────────────────────────────
+    # For each pending plan, find other plans (pending/approved) from OTHER
+    # employees in the same team whose dates overlap.
+    # Also check against already-approved LeaveRequests for the same team.
+
+    def dates_overlap(s1, e1, s2, e2):
+        return s1 <= e2 and s2 <= e1
+
+    def overlap_range(s1, e1, s2, e2):
+        """Returns the actual overlapping start/end dates as formatted strings."""
+        overlap_start = max(s1, s2)
+        overlap_end = min(e1, e2)
+        days = (overlap_end - overlap_start).days + 1
+        return overlap_start.strftime("%d %b %Y"), overlap_end.strftime("%d %b %Y"), days
+
+    # Build a lookup: plan_id → list of conflicting employee names + date ranges
+    conflict_map = {}  # plan.id → [{"name": ..., "start": ..., "end": ..., "source": "plan"|"request"}]
+
+    # Collect all non-rejected plans for the team (for cross-checking)
+    team_plans = LeavePlan.objects.filter(
+        employee_id__in=subordinates
+    ).exclude(status="rejected").select_related("employee_id")
+
+    # Collect approved leave requests for the team
+    team_leave_requests = LeaveRequest.objects.filter(
+        employee_id__in=subordinates, status="approved"
+    ).select_related("employee_id")
+
+    for plan in plans:
+        conflicts = []
+
+        # Check against other team plans
+        for other in team_plans:
+            if other.employee_id_id == plan.employee_id_id:
+                continue  # same employee, skip
+            if other.id == plan.id:
+                continue
+            if dates_overlap(plan.start_date, plan.end_date, other.start_date, other.end_date):
+                ov_start, ov_end, ov_days = overlap_range(plan.start_date, plan.end_date, other.start_date, other.end_date)
+                conflicts.append({
+                    "name": other.employee_id.get_full_name(),
+                    "start": other.start_date.strftime("%d %b %Y"),
+                    "end": other.end_date.strftime("%d %b %Y"),
+                    "overlap_start": ov_start,
+                    "overlap_end": ov_end,
+                    "overlap_days": ov_days,
+                    "source": "plan",
+                    "status": other.status,
+                })
+
+        # Check against approved leave requests
+        for lr in team_leave_requests:
+            if lr.employee_id_id == plan.employee_id_id:
+                continue
+            lr_end = lr.end_date or lr.start_date
+            if dates_overlap(plan.start_date, plan.end_date, lr.start_date, lr_end):
+                ov_start, ov_end, ov_days = overlap_range(plan.start_date, plan.end_date, lr.start_date, lr_end)
+                conflicts.append({
+                    "name": lr.employee_id.get_full_name(),
+                    "start": lr.start_date.strftime("%d %b %Y"),
+                    "end": lr_end.strftime("%d %b %Y"),
+                    "overlap_start": ov_start,
+                    "overlap_end": ov_end,
+                    "overlap_days": ov_days,
+                    "source": "request",
+                    "status": "approved",
+                })
+
+        if conflicts:
+            conflict_map[plan.id] = conflicts
+
+    # Attach conflict info to each plan object for easy template access
+    # (stored as public attribute to avoid Django template underscore restriction)
+    for plan in plans:
+        plan.conflicts = conflict_map.get(plan.id, [])
+
     return render(request, "leave/planner/manager_view.html", {
         "plans": plans,
         "all_plans": all_plans,
         "subordinates": subordinates,
+        "conflict_map_json": json.dumps(conflict_map),
     })
 
 
 @login_required
 def leave_planner_approve(request, plan_id):
     """
-    Manager approves a leave plan.
+    Manager approves a leave plan and auto-creates an approved LeaveRequest,
+    deducting the balance exactly as the normal leave approval flow does.
     """
     manager_employee = request.user.employee_get
     plan = get_object_or_404(LeavePlan, id=plan_id)
-    # Verify the approver is the employee's reporting manager
+
+    # Auth check
     reporting_manager = getattr(
         getattr(plan.employee_id, "employee_work_info", None),
         "reporting_manager_id",
@@ -5742,11 +5846,90 @@ def leave_planner_approve(request, plan_id):
     if reporting_manager != manager_employee and not request.user.has_perm("leave.change_leaveplan"):
         messages.error(request, _("You are not authorised to approve this plan."))
         return redirect("manager-leave-planner-view")
+
+    if plan.status != "pending":
+        messages.warning(request, _("This plan has already been actioned."))
+        return redirect("manager-leave-planner-view")
+
+    employee = plan.employee_id
+    leave_type = plan.leave_type_id
+
+    # Get the employee's leave balance
+    try:
+        available_leave = AvailableLeave.objects.get(
+            employee_id=employee, leave_type_id=leave_type
+        )
+    except AvailableLeave.DoesNotExist:
+        messages.error(request, _("No leave balance found for this employee and leave type."))
+        return redirect("manager-leave-planner-view")
+
+    # Calculate requested days (simple calendar days for a plan)
+    requested_days = (plan.end_date - plan.start_date).days + 1
+    total_available = available_leave.available_days + available_leave.carryforward_days
+
+    if total_available < requested_days:
+        messages.error(
+            request,
+            _(
+                "%(employee)s does not have enough leave balance (%(available)s days available, "
+                "%(requested)s days requested)."
+            ) % {
+                "employee": employee.get_full_name(),
+                "available": total_available,
+                "requested": requested_days,
+            },
+        )
+        return redirect("manager-leave-planner-view")
+
+    # Create the LeaveRequest as approved
+    leave_request = LeaveRequest(
+        employee_id=employee,
+        leave_type_id=leave_type,
+        start_date=plan.start_date,
+        end_date=plan.end_date,
+        requested_days=requested_days,
+        description=plan.note or _("Created from approved leave plan."),
+        status="approved",
+        created_by=manager_employee,
+    )
+
+    # Deduct balance — carryforward first, then available (mirrors leave_request_approve logic)
+    if requested_days > available_leave.carryforward_days:
+        deduct_from_available = requested_days - available_leave.carryforward_days
+        leave_request.approved_carryforward_days = available_leave.carryforward_days
+        available_leave.carryforward_days = 0
+        available_leave.available_days -= deduct_from_available
+        leave_request.approved_available_days = deduct_from_available
+    else:
+        available_leave.carryforward_days -= requested_days
+        leave_request.approved_carryforward_days = requested_days
+        leave_request.approved_available_days = 0
+
+    leave_request.save()
+    available_leave.save()
+
+    # Mark the plan as approved and link the generated leave request
     plan.status = "approved"
     plan.approved_by = manager_employee
     plan.reject_reason = ""
+    plan.leave_request = leave_request
     plan.save()
-    messages.success(request, _("Leave plan approved."))
+
+    # Notify the employee
+    with contextlib.suppress(Exception):
+        notify.send(
+            manager_employee,
+            recipient=employee.employee_user_id,
+            verb=f"Your leave plan ({plan.start_date} – {plan.end_date}) has been approved and a leave request has been created.",
+            icon="people-circle",
+            redirect=reverse("user-request-view") + f"?id={leave_request.id}",
+        )
+
+    messages.success(
+        request,
+        _("Leave plan approved and leave request #%(id)s created for %(employee)s.")
+        % {"id": leave_request.id, "employee": employee.get_full_name()},
+    )
     return redirect("manager-leave-planner-view")
 
 
@@ -5780,3 +5963,98 @@ def leave_planner_reject(request, plan_id):
         "form": form,
         "plan": plan,
     })
+
+
+@login_required
+def leave_planner_convert(request, plan_id):
+    """
+    Employee converts their own approved leave plan into an actual LeaveRequest (POST only).
+    """
+    if request.method != "POST":
+        return HttpResponseRedirect("/leave/planner/")
+
+    employee = request.user.employee_get
+    plan = get_object_or_404(LeavePlan, id=plan_id, employee_id=employee)
+
+    if plan.status != "approved":
+        messages.warning(request, _("Only approved plans can be converted to leave requests."))
+        return HttpResponseRedirect("/leave/planner/")
+
+    if plan.leave_request_id:
+        messages.info(request, _("This plan has already been converted to a leave request."))
+        return HttpResponseRedirect("/leave/planner/")
+
+    leave_type = plan.leave_type_id
+
+    # Get the employee's leave balance
+    try:
+        available_leave = AvailableLeave.objects.get(
+            employee_id=employee, leave_type_id=leave_type
+        )
+    except AvailableLeave.DoesNotExist:
+        messages.error(request, _("No leave balance found for this leave type."))
+        return HttpResponseRedirect("/leave/planner/")
+
+    # Calculate effective requested days using the leave type's full config
+    raw_days = (plan.end_date - plan.start_date).days + 1
+    requested_days = cal_effective_requested_days(
+        plan.start_date, plan.end_date, leave_type, raw_days
+    )
+
+    if requested_days <= 0:
+        messages.error(request, _("No working days in the selected range after excluding weekends/holidays."))
+        return HttpResponseRedirect("/leave/planner/")
+
+    total_available = available_leave.available_days + available_leave.carryforward_days
+    if total_available < requested_days:
+        messages.error(
+            request,
+            _(
+                "Insufficient leave balance. You have %(available)s day(s) available but "
+                "this plan requires %(requested)s working day(s)."
+            ) % {"available": total_available, "requested": requested_days},
+        )
+        return HttpResponseRedirect("/leave/planner/")
+
+    # Create the LeaveRequest as approved, using the plan's data
+    leave_request = LeaveRequest(
+        employee_id=employee,
+        leave_type_id=leave_type,
+        start_date=plan.start_date,
+        end_date=plan.end_date,
+        requested_days=requested_days,
+        description=plan.note or _("Converted from approved leave plan."),
+        status="approved",
+        created_by=employee,
+    )
+
+    # Deduct balance — carryforward first, then available days
+    if requested_days > available_leave.carryforward_days:
+        deduct_from_available = requested_days - available_leave.carryforward_days
+        leave_request.approved_carryforward_days = available_leave.carryforward_days
+        available_leave.carryforward_days = 0
+        available_leave.available_days -= deduct_from_available
+        leave_request.approved_available_days = deduct_from_available
+    else:
+        available_leave.carryforward_days -= requested_days
+        leave_request.approved_carryforward_days = requested_days
+        leave_request.approved_available_days = 0
+
+    leave_request.save()
+    available_leave.save()
+
+    # Link the leave request back to the plan so it can't be converted twice
+    plan.leave_request = leave_request
+    plan.save()
+
+    # Send mail notification
+    with contextlib.suppress(Exception):
+        mail_thread = LeaveMailSendThread(request, leave_request, type="approve")
+        mail_thread.start()
+
+    messages.success(
+        request,
+        _("Leave request #%(id)s created successfully for %(days)s day(s) of %(leave_type)s.")
+        % {"id": leave_request.id, "days": requested_days, "leave_type": leave_type.name},
+    )
+    return HttpResponseRedirect("/leave/planner/")
