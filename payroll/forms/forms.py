@@ -187,9 +187,17 @@ class DashboardExport(Form):
     )
     employees = forms.ChoiceField(
         required=False,
-        choices=[(emp.id, emp.get_full_name()) for emp in Employee.objects.all()],
+        choices=[],  # Will be populated in __init__
         widget=forms.SelectMultiple,
     )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only load active employees to reduce memory usage
+        self.fields['employees'].choices = [
+            (emp.id, emp.get_full_name()) 
+            for emp in Employee.objects.filter(is_active=True).only('id', 'employee_first_name', 'employee_last_name')
+        ]
     status = forms.ChoiceField(required=False, choices=status_choices)
     contributions = forms.ChoiceField(
         required=False,
