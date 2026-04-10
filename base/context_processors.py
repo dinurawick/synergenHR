@@ -52,9 +52,10 @@ def get_companies(request):
     """
     This method will return the history additional field form
     """
+    # Use only() to fetch only required fields for better performance
     companies = list(
         [company.id, company.company, company.icon.url, False]
-        for company in Company.objects.all()
+        for company in Company.objects.only('id', 'company', 'icon').all()
     )
     companies = [
         [

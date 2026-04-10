@@ -1069,7 +1069,18 @@ def employee_view(request):
     page_number = request.GET.get("page")
     error_message = request.session.pop("error_message", None)
 
-    queryset = Employee.objects.filter()
+    # Optimize queryset with select_related for better performance
+    queryset = Employee.objects.select_related(
+        'employee_user_id',
+        'employee_work_info__department_id__department',
+        'employee_work_info__job_position_id',
+        'employee_work_info__employee_type_id',
+        'employee_work_info__reporting_manager_id'
+    ).prefetch_related(
+        'employee_bank_details',
+        'employee_work_info'
+    )
+    
     filter_obj = EmployeeFilter(request.GET, queryset=queryset).qs
     if request.GET.get("is_active") != "False":
         filter_obj = filter_obj.filter(is_active=True)
@@ -1077,10 +1088,11 @@ def employee_view(request):
     update_fields = BulkUpdateFieldForm()
     data_dict = parse_qs(previous_data)
     get_key_instances(Employee, data_dict)
-    emp = Employee.objects.filter()
-
-    # Store the employees in the session
-    request.session["filtered_employees"] = [employee.id for employee in queryset]
+    
+    # Only store limited employee IDs in session for performance
+    MAX_SESSION_EMPLOYEES = 1000
+    filtered_employee_ids = list(filter_obj.values_list('id', flat=True)[:MAX_SESSION_EMPLOYEES])
+    request.session["filtered_employees"] = filtered_employee_ids
 
     return render(
         request,
@@ -2907,18 +2919,26 @@ def dashboard_employee(request):
     """
     Active and in-active employee dashboard
     """
+    from django.db.models import Count, Case, When, IntegerField
+    
     labels = [
         _("Active"),
         _("In-Active"),
     ]
-    employees = Employee.objects.filter()
+    
+    # Use database aggregation instead of multiple queries
+    employee_counts = Employee.objects.aggregate(
+        active_count=Count(Case(When(is_active=True, then=1), output_field=IntegerField())),
+        inactive_count=Count(Case(When(is_active=False, then=1), output_field=IntegerField()))
+    )
+    
     response = {
         "dataSet": [
             {
                 "label": _("Employees"),
                 "data": [
-                    len(employees.filter(is_active=True)),
-                    len(employees.filter(is_active=False)),
+                    employee_counts['active_count'],
+                    employee_counts['inactive_count'],
                 ],
             },
         ],
@@ -2932,17 +2952,25 @@ def dashboard_employee_gender(request):
     """
     This method is used to filter out gender vise employees
     """
+    from django.db.models import Count, Case, When, IntegerField
+    
     labels = [_("Male"), _("Female"), _("Other")]
-    employees = Employee.objects.filter(is_active=True)
+    
+    # Use database aggregation instead of multiple queries
+    gender_counts = Employee.objects.filter(is_active=True).aggregate(
+        male_count=Count(Case(When(gender='male', then=1), output_field=IntegerField())),
+        female_count=Count(Case(When(gender='female', then=1), output_field=IntegerField())),
+        other_count=Count(Case(When(gender='other', then=1), output_field=IntegerField()))
+    )
 
     response = {
         "dataSet": [
             {
                 "label": _("Employees"),
                 "data": [
-                    len(employees.filter(gender="male")),
-                    len(employees.filter(gender="female")),
-                    len(employees.filter(gender="other")),
+                    gender_counts['male_count'],
+                    gender_counts['female_count'],
+                    gender_counts['other_count'],
                 ],
             },
         ],
@@ -2956,24 +2984,26 @@ def dashboard_employee_department(request):
     """
     This method is used to find the count of employees corresponding to the departments
     """
+    from django.db.models import Count
+    
+    # Use database aggregation instead of Python loops
+    department_counts = (
+        Employee.objects
+        .filter(is_active=True, employee_work_info__department_id__isnull=False)
+        .select_related('employee_work_info__department_id')
+        .values('employee_work_info__department_id__department')
+        .annotate(count=Count('id'))
+        .order_by('employee_work_info__department_id__department')
+    )
+    
     labels = []
     count = []
-    departments = Department.objects.all()
-    for dept in departments:
-        if len(
-            Employee.objects.filter(
-                employee_work_info__department_id__department=dept, is_active=True
-            )
-        ):
-            labels.append(dept.department)
-            count.append(
-                len(
-                    Employee.objects.filter(
-                        employee_work_info__department_id__department=dept,
-                        is_active=True,
-                    )
-                )
-            )
+    
+    for dept_data in department_counts:
+        if dept_data['count'] > 0:
+            labels.append(dept_data['employee_work_info__department_id__department'])
+            count.append(dept_data['count'])
+    
     response = {
         "dataSet": [{"label": "Department", "data": count}],
         "labels": labels,
@@ -3005,14 +3035,30 @@ def employee_select(request):
     This method is used to return all the id of the employees to select the employee row
     """
     page_number = request.GET.get("page")
+    
+    # Add pagination limit to prevent mobile freezing
+    MAX_EMPLOYEES = 1000  # Limit for mobile performance
+    
     employees = Employee.objects.filter()
     if page_number == "all":
         employees = Employee.objects.filter(is_active=True)
-
-    employee_ids = [str(emp.id) for emp in employees]
+    
+    # Limit the number of employees returned
     total_count = employees.count()
-
-    context = {"employee_ids": employee_ids, "total_count": total_count}
+    if total_count > MAX_EMPLOYEES:
+        # Return only first batch with warning
+        employees = employees[:MAX_EMPLOYEES]
+        employee_ids = [str(emp.id) for emp in employees]
+        context = {
+            "employee_ids": employee_ids, 
+            "total_count": total_count,
+            "limited": True,
+            "limit": MAX_EMPLOYEES,
+            "message": f"Showing first {MAX_EMPLOYEES} employees for performance. Use filters to narrow results."
+        }
+    else:
+        employee_ids = [str(emp.id) for emp in employees]
+        context = {"employee_ids": employee_ids, "total_count": total_count}
 
     return JsonResponse(context, safe=False)
 
@@ -3024,6 +3070,8 @@ def employee_select_filter(request):
     This method is used to return all the ids of the filtered employees
     """
     page_number = request.GET.get("page")
+    MAX_EMPLOYEES = 1000  # Limit for mobile performance
+    
     if page_number == "all":
         employee_filter = EmployeeFilter(
             request.GET, queryset=Employee.objects.filter()
@@ -3032,10 +3080,23 @@ def employee_select_filter(request):
         filtered_employees = filtersubordinatesemployeemodel(
             request=request, queryset=employee_filter.qs, perm="employee.view_employee"
         )
-        employee_ids = [str(emp.id) for emp in filtered_employees]
+        
+        # Limit the number of employees returned
         total_count = filtered_employees.count()
-
-        context = {"employee_ids": employee_ids, "total_count": total_count}
+        if total_count > MAX_EMPLOYEES:
+            # Return only first batch with warning
+            limited_employees = filtered_employees[:MAX_EMPLOYEES]
+            employee_ids = [str(emp.id) for emp in limited_employees]
+            context = {
+                "employee_ids": employee_ids, 
+                "total_count": total_count,
+                "limited": True,
+                "limit": MAX_EMPLOYEES,
+                "message": f"Showing first {MAX_EMPLOYEES} employees for performance. Use more specific filters."
+            }
+        else:
+            employee_ids = [str(emp.id) for emp in filtered_employees]
+            context = {"employee_ids": employee_ids, "total_count": total_count}
 
         return JsonResponse(context)
 

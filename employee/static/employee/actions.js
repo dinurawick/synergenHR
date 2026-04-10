@@ -179,6 +179,11 @@ function selectAllEmployees() {
     $("#selectedShow").removeAttr("style");
     var savedFilters = JSON.parse(localStorage.getItem("savedFilters"));
     var filterQuery = $("#selectAllEmployees").data("pd");
+    
+    // Show loading indicator for mobile
+    var loadingHtml = '<div id="selectAllLoading" class="text-center"><i class="fa fa-spinner fa-spin"></i> Loading employees...</div>';
+    $("#selectedShow").prepend(loadingHtml);
+    
     if (savedFilters && savedFilters["filterData"] !== null) {
         $.ajax({
             url: "/employee/employee-select-filter?" + filterQuery,
@@ -186,29 +191,62 @@ function selectAllEmployees() {
             type: "GET",
             dataType: "json",
             success: function (response) {
+                $("#selectAllLoading").remove();
+                
                 var employeeIds = response.employee_ids;
-
-                if (Array.isArray(employeeIds)) {
-                    // Continue
-                } else {
+                
+                if (!Array.isArray(employeeIds)) {
                     console.error("employee_ids is not an array:", employeeIds);
+                    return;
+                }
+                
+                // Check if results were limited
+                if (response.limited) {
+                    alert(response.message);
                 }
 
                 allEmployeeCount = employeeIds.length;
-
+                
+                // Batch DOM operations for better mobile performance
+                var checkboxes = [];
                 for (var i = 0; i < employeeIds.length; i++) {
                     var empId = employeeIds[i];
-                    $("#" + empId).prop("checked", true);
+                    var checkbox = document.getElementById(empId);
+                    if (checkbox) {
+                        checkboxes.push(checkbox);
+                    }
                 }
-                $("#selectedInstances").attr("data-ids", JSON.stringify(employeeIds));
-
-                count = makeListUnique(employeeIds);
-                $("#unselectAllEmployees").css("display", "inline-flex");
-                $("#exportEmployees").css("display", "inline-flex");
-                tickCheckboxes(count);
+                
+                // Use requestAnimationFrame for smooth UI updates on mobile
+                function batchCheckboxes(startIndex) {
+                    var endIndex = Math.min(startIndex + 50, checkboxes.length); // Process 50 at a time
+                    
+                    for (var i = startIndex; i < endIndex; i++) {
+                        checkboxes[i].checked = true;
+                    }
+                    
+                    if (endIndex < checkboxes.length) {
+                        requestAnimationFrame(function() {
+                            batchCheckboxes(endIndex);
+                        });
+                    } else {
+                        // Finish up
+                        $("#selectedInstances").attr("data-ids", JSON.stringify(employeeIds));
+                        count = makeListUnique(employeeIds);
+                        $("#unselectAllEmployees").css("display", "inline-flex");
+                        $("#exportEmployees").css("display", "inline-flex");
+                        tickCheckboxes(count);
+                    }
+                }
+                
+                if (checkboxes.length > 0) {
+                    batchCheckboxes(0);
+                }
             },
             error: function (xhr, status, error) {
+                $("#selectAllLoading").remove();
                 console.error("Error:", error);
+                alert("Error loading employees. Please try again or use filters to narrow results.");
             },
         });
     } else {
@@ -218,35 +256,68 @@ function selectAllEmployees() {
             type: "GET",
             dataType: "json",
             success: function (response) {
+                $("#selectAllLoading").remove();
+                
                 var employeeIds = response.employee_ids;
 
-                if (Array.isArray(employeeIds)) {
-                    // Continue
-                } else {
+                if (!Array.isArray(employeeIds)) {
                     console.error("employee_ids is not an array:", employeeIds);
+                    return;
+                }
+                
+                // Check if results were limited
+                if (response.limited) {
+                    alert(response.message);
                 }
 
                 allEmployeeCount = employeeIds.length;
 
+                // Batch DOM operations for better mobile performance
+                var checkboxes = [];
                 for (var i = 0; i < employeeIds.length; i++) {
                     var empId = employeeIds[i];
-                    $("#" + empId).prop("checked", true);
+                    var checkbox = document.getElementById(empId);
+                    if (checkbox) {
+                        checkboxes.push(checkbox);
+                    }
                 }
-                var previousIds = $("#selectedInstances").attr("data-ids");
-                $("#selectedInstances").attr(
-                    "data-ids",
-                    JSON.stringify(
-                        Array.from(new Set([...employeeIds, ...JSON.parse(previousIds)]))
-                    )
-                );
-
-                count = makeListUnique(employeeIds);
-                $("#unselectAllEmployees").css("display", "inline-flex");
-                $("#exportEmployees").css("display", "inline-flex");
-                tickCheckboxes(count);
+                
+                // Use requestAnimationFrame for smooth UI updates on mobile
+                function batchCheckboxes(startIndex) {
+                    var endIndex = Math.min(startIndex + 50, checkboxes.length); // Process 50 at a time
+                    
+                    for (var i = startIndex; i < endIndex; i++) {
+                        checkboxes[i].checked = true;
+                    }
+                    
+                    if (endIndex < checkboxes.length) {
+                        requestAnimationFrame(function() {
+                            batchCheckboxes(endIndex);
+                        });
+                    } else {
+                        // Finish up
+                        var previousIds = $("#selectedInstances").attr("data-ids");
+                        $("#selectedInstances").attr(
+                            "data-ids",
+                            JSON.stringify(
+                                Array.from(new Set([...employeeIds, ...JSON.parse(previousIds)]))
+                            )
+                        );
+                        count = makeListUnique(employeeIds);
+                        $("#unselectAllEmployees").css("display", "inline-flex");
+                        $("#exportEmployees").css("display", "inline-flex");
+                        tickCheckboxes(count);
+                    }
+                }
+                
+                if (checkboxes.length > 0) {
+                    batchCheckboxes(0);
+                }
             },
             error: function (xhr, status, error) {
+                $("#selectAllLoading").remove();
                 console.error("Error:", error);
+                alert("Error loading employees. Please try again or use filters to narrow results.");
             },
         });
     }
