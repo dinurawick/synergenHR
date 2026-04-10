@@ -492,9 +492,11 @@ class CandidateCreationForm(BaseModelForm):
 
     def clean(self):
         errors = {}
-        profile = self.cleaned_data["profile"]
-        resume = self.cleaned_data["resume"]
-        recruitment: Recruitment = self.cleaned_data["recruitment_id"]
+        profile = self.cleaned_data.get("profile")
+        resume = self.cleaned_data.get("resume")
+        recruitment: Recruitment = self.cleaned_data.get("recruitment_id")
+        if not recruitment:
+            return super().clean()
         if not resume and not recruitment.optional_resume:
             errors["resume"] = _("This field is required")
         if not profile and not recruitment.optional_profile_image:
