@@ -233,4 +233,8 @@ deployment/.env.production
 !deployment/deploy_gf.sh
 !deployment/gf.synergenhr.lk.conf
 !deployment/docker-compose.gf.yml
+!deployment/deploy_pibt.sh
+!deployment/pibt.synergenhr.lk.conf
+!deployment/docker-compose.pibt.yml
+!deployment/update.sh
 CODE_OF_CONDUCT.md

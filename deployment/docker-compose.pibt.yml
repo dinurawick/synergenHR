@@ -1,0 +1,43 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synergenhr-pibt-web
+    ports:
+      - "8003:8000"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://postgres:${DB_PASSWORD}@db:5432/synergenhr_pibt"
+    command: sh ./entrypoint.sh
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.production
+
+  db:
+    image: postgres:16-bullseye
+    container_name: synergenhr-pibt-db
+    environment:
+      POSTGRES_DB: synergenhr_pibt
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5434:5432"
+    restart: unless-stopped
+    volumes:
+      - synergenhr-pibt-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  synergenhr-pibt-data:
