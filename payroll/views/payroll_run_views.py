@@ -4,6 +4,7 @@ Views for handling payroll run operations.
 
 from django.contrib import messages
 from django.db.models import Q, ProtectedError
+from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
@@ -275,6 +276,9 @@ def update_payroll_run_status(request, run_id):
                             _(f"Payroll run approved. No new payslips were generated (employees may already have payslips for this period).")
                         )
                 except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error generating payslips for payroll run {payroll_run.id}: {str(e)}")
                     messages.error(
                         request,
                         _(f"Payroll run approved but error generating payslips: {str(e)}")
@@ -297,103 +301,117 @@ def generate_payslips_for_approved_run(payroll_run):
     Generate payslips for employees in an approved payroll run.
     This function now considers employee contract pay frequency.
     """
-    from payroll.models.models import Payslip
+    from payroll.models.models import Payslip, Contract
     from payroll.views.component_views import payroll_calculation, save_payslip, calculate_employer_contribution
     import json
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     generated_count = 0
     skipped_count = 0
     
-    # Get selected employees from notes (temporary solution)
-    selected_employee_ids = []
-    if payroll_run.notes and "Selected Employees:" in payroll_run.notes:
-        try:
-            # Extract employee IDs from notes
-            notes_lines = payroll_run.notes.split('\n')
-            for line in notes_lines:
-                if line.strip().startswith("Selected Employees:"):
-                    ids_str = line.split("Selected Employees:")[1].strip()
-                    selected_employee_ids = [int(id.strip()) for id in ids_str.split(',') if id.strip()]
-                    break
-        except (ValueError, IndexError):
-            pass
-    
-    # If no employees selected in notes, get all active employees
-    if not selected_employee_ids:
-        from employee.models import Employee
-        selected_employees = Employee.objects.filter(is_active=True)
-    else:
-        from employee.models import Employee
-        selected_employees = Employee.objects.filter(id__in=selected_employee_ids, is_active=True)
-    
-    for employee in selected_employees:
-        # Check employee's contract pay frequency compatibility
-        contract = Contract.objects.filter(employee_id=employee, contract_status="active").first()
-        
-        if not contract:
-            skipped_count += 1
-            continue
-            
-        # Check if employee's pay frequency matches or is compatible with payroll run frequency
-        if not is_frequency_compatible(contract.pay_frequency, payroll_run.frequency):
-            skipped_count += 1
-            continue
-        
-        # Check if payslip already exists for this employee and period
-        existing_payslip = Payslip.objects.filter(
-            employee_id=employee,
-            start_date=payroll_run.period_start,
-            end_date=payroll_run.period_end
-        ).first()
-        
-        if not existing_payslip:
+    # Use database transaction to ensure data consistency
+    with transaction.atomic():
+        # Get selected employees from notes (temporary solution)
+        selected_employee_ids = []
+        if payroll_run.notes and "Selected Employees:" in payroll_run.notes:
             try:
-                # Calculate salary based on payroll run frequency and contract
-                adjusted_period = calculate_pay_period_for_frequency(
-                    payroll_run.period_start, 
-                    payroll_run.period_end, 
-                    contract.pay_frequency,
-                    payroll_run.frequency
-                )
-                
-                # Generate payslip data using existing payroll calculation
-                payslip_data = payroll_calculation(employee, adjusted_period['start'], adjusted_period['end'])
-                
-                # Prepare data for saving
-                data = {
-                    "employee": employee,
-                    "start_date": payslip_data["start_date"],
-                    "end_date": payslip_data["end_date"],
-                    "status": "draft",
-                    "contract_wage": payslip_data["contract_wage"],
-                    "basic_pay": payslip_data["basic_pay"],
-                    "gross_pay": payslip_data["gross_pay"],
-                    "deduction": payslip_data["total_deductions"],
-                    "net_pay": payslip_data["net_pay"],
-                    "pay_data": json.loads(payslip_data["json_data"]),
-                    "installments": payslip_data["installments"],
-                    "payroll_run": payroll_run
-                }
-                
-                # Calculate employer contribution
-                # calculate_employer_contribution(data)  # Disabled - using new employer_contributions system
-                
-                # Save the payslip
-                payslip_instance = save_payslip(**data)
-                generated_count += 1
-                
-            except Exception as e:
-                # Log the error but continue with other employees
+                # Extract employee IDs from notes
+                notes_lines = payroll_run.notes.split('\n')
+                for line in notes_lines:
+                    if line.strip().startswith("Selected Employees:"):
+                        ids_str = line.split("Selected Employees:")[1].strip()
+                        selected_employee_ids = [int(id.strip()) for id in ids_str.split(',') if id.strip()]
+                        break
+            except (ValueError, IndexError):
+                pass
+        
+        # If no employees selected in notes, get all active employees
+        if not selected_employee_ids:
+            from employee.models import Employee
+            selected_employees = Employee.objects.filter(is_active=True)
+        else:
+            from employee.models import Employee
+            selected_employees = Employee.objects.filter(id__in=selected_employee_ids, is_active=True)
+        
+        for employee in selected_employees:
+            # Check employee's contract pay frequency compatibility
+            contract = Contract.objects.filter(employee_id=employee, contract_status="active").first()
+            
+            if not contract:
                 skipped_count += 1
                 continue
-        else:
-            # Link existing payslip to this payroll run if not already linked
-            if not existing_payslip.payroll_run:
-                existing_payslip.payroll_run = payroll_run
-                existing_payslip.save()
-    
-    # Update payroll run totals
-    payroll_run.update_totals()
+                
+            # Check if employee's pay frequency matches or is compatible with payroll run frequency
+            if not is_frequency_compatible(contract.pay_frequency, payroll_run.frequency):
+                skipped_count += 1
+                continue
+            
+            # Check if payslip already exists for this employee and period
+            existing_payslip = Payslip.objects.filter(
+                employee_id=employee,
+                start_date=payroll_run.period_start,
+                end_date=payroll_run.period_end
+            ).first()
+            
+            if not existing_payslip:
+                try:
+                    # Calculate salary based on payroll run frequency and contract
+                    adjusted_period = calculate_pay_period_for_frequency(
+                        payroll_run.period_start, 
+                        payroll_run.period_end, 
+                        contract.pay_frequency,
+                        payroll_run.frequency
+                    )
+                    
+                    # Generate payslip data using existing payroll calculation
+                    payslip_data = payroll_calculation(employee, adjusted_period['start'], adjusted_period['end'])
+                    
+                    # Safely parse JSON data
+                    try:
+                        pay_data = json.loads(payslip_data["json_data"]) if isinstance(payslip_data["json_data"], str) else payslip_data["json_data"]
+                    except (json.JSONDecodeError, TypeError) as json_error:
+                        logger.error(f"JSON parsing error for employee {employee.id}: {json_error}")
+                        skipped_count += 1
+                        continue
+                    
+                    # Prepare data for saving
+                    data = {
+                        "employee": employee,
+                        "start_date": payslip_data["start_date"],
+                        "end_date": payslip_data["end_date"],
+                        "status": "draft",
+                        "contract_wage": payslip_data["contract_wage"],
+                        "basic_pay": payslip_data["basic_pay"],
+                        "gross_pay": payslip_data["gross_pay"],
+                        "deduction": payslip_data["total_deductions"],
+                        "net_pay": payslip_data["net_pay"],
+                        "pay_data": pay_data,
+                        "installments": payslip_data["installments"],
+                        "payroll_run": payroll_run
+                    }
+                    
+                    # Calculate employer contribution
+                    # calculate_employer_contribution(data)  # Disabled - using new employer_contributions system
+                    
+                    # Save the payslip
+                    payslip_instance = save_payslip(**data)
+                    generated_count += 1
+                    
+                except Exception as e:
+                    # Log the error but continue with other employees
+                    logger.error(f"Error generating payslip for employee {employee.id}: {str(e)}")
+                    skipped_count += 1
+                    continue
+            else:
+                # Link existing payslip to this payroll run if not already linked
+                if not existing_payslip.payroll_run:
+                    existing_payslip.payroll_run = payroll_run
+                    existing_payslip.save()
+        
+        # Update payroll run totals
+        payroll_run.update_totals()
     
     return generated_count
 

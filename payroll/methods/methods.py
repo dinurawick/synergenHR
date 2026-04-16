@@ -589,29 +589,62 @@ def save_payslip(**kwargs):
     """
     This method is used to save the generated payslip
     """
-    filtered_instance = Payslip.objects.filter(
-        employee_id=kwargs["employee"],
-        start_date=kwargs["start_date"],
-        end_date=kwargs["end_date"],
-    ).first()
-    instance = filtered_instance if filtered_instance is not None else Payslip()
-    instance.employee_id = kwargs["employee"]
-    instance.group_name = kwargs.get("group_name")
-    instance.start_date = kwargs["start_date"]
-    instance.end_date = kwargs["end_date"]
-    instance.status = kwargs["status"]
-    instance.basic_pay = round(kwargs["basic_pay"], 2)
-    instance.contract_wage = round(kwargs["contract_wage"], 2)
-    instance.gross_pay = round(kwargs["gross_pay"], 2)
-    instance.deduction = round(kwargs["deduction"], 2)
-    instance.net_pay = round(kwargs["net_pay"], 2)
-    instance.pay_head_data = kwargs["pay_data"]
-    instance.payroll_run = kwargs.get("payroll_run")  # Add payroll run
-    instance.save()
-    instance.installment_ids.set(kwargs["installments"])
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Update payroll run totals if payroll_run is set
-    if instance.payroll_run:
-        instance.payroll_run.update_totals()
-    
-    return instance
+    try:
+        filtered_instance = Payslip.objects.filter(
+            employee_id=kwargs["employee"],
+            start_date=kwargs["start_date"],
+            end_date=kwargs["end_date"],
+        ).first()
+        instance = filtered_instance if filtered_instance is not None else Payslip()
+        
+        # Validate required fields
+        if not kwargs.get("employee"):
+            raise ValueError("Employee is required")
+        if not kwargs.get("start_date") or not kwargs.get("end_date"):
+            raise ValueError("Start date and end date are required")
+        
+        instance.employee_id = kwargs["employee"]
+        instance.group_name = kwargs.get("group_name")
+        instance.start_date = kwargs["start_date"]
+        instance.end_date = kwargs["end_date"]
+        instance.status = kwargs["status"]
+        
+        # Safely handle numeric fields with proper validation
+        try:
+            instance.basic_pay = round(float(kwargs.get("basic_pay", 0)), 2)
+            instance.contract_wage = round(float(kwargs.get("contract_wage", 0)), 2)
+            instance.gross_pay = round(float(kwargs.get("gross_pay", 0)), 2)
+            instance.deduction = round(float(kwargs.get("deduction", 0)), 2)
+            instance.net_pay = round(float(kwargs.get("net_pay", 0)), 2)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error converting numeric fields for payslip: {e}")
+            raise ValueError(f"Invalid numeric value in payslip data: {e}")
+        
+        # Validate pay_data is proper JSON
+        pay_data = kwargs.get("pay_data", {})
+        if not isinstance(pay_data, dict):
+            raise ValueError("pay_data must be a dictionary")
+        
+        instance.pay_head_data = pay_data
+        instance.payroll_run = kwargs.get("payroll_run")
+        
+        # Save with proper error handling
+        instance.save()
+        
+        # Handle installments safely
+        installments = kwargs.get("installments", [])
+        if installments:
+            instance.installment_ids.set(installments)
+        
+        # Update payroll run totals if payroll_run is set
+        if instance.payroll_run:
+            instance.payroll_run.update_totals()
+        
+        return instance
+        
+    except Exception as e:
+        logger.error(f"Error saving payslip for employee {kwargs.get('employee')}: {str(e)}")
+        raise
